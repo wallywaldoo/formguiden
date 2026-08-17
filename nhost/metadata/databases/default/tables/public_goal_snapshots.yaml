@@ -1,0 +1,51 @@
+table:
+  name: goal_snapshots
+  schema: public
+object_relationships:
+  - name: goal
+    using:
+      foreign_key_constraint_on: goal_id
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - goal_id
+        - source
+        - race_type
+        - race_distance_m
+        - race_date
+        - target_duration_s
+        - target_pace_s_per_km
+        - target_mass_kg
+        - weekly_run_distance_m
+        - weekly_run_duration_s
+        - weekly_strength_sessions
+        - weekly_strength_duration_s
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - user_id
+        - goal_id
+        - captured_at
+        - source
+        - race_type
+        - race_distance_m
+        - race_date
+        - target_duration_s
+        - target_pace_s_per_km
+        - target_mass_kg
+        - weekly_run_distance_m
+        - weekly_run_duration_s
+        - weekly_strength_sessions
+        - weekly_strength_duration_s
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false

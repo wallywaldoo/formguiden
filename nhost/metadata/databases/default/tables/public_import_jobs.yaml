@@ -1,0 +1,57 @@
+table:
+  name: import_jobs
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - import_id
+        - cursor
+        - lease_expires_at
+        - heartbeat_at
+        - attempt_count
+        - last_error
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - import_id
+        - cursor
+        - lease_expires_at
+        - heartbeat_at
+        - attempt_count
+        - last_error
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - cursor
+        - lease_expires_at
+        - heartbeat_at
+        - attempt_count
+        - last_error
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

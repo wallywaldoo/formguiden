@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Formkurvan tests" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Test run</name>
+    <trkseg>
+      <trkpt lat="59.3293" lon="18.0686">
+        <ele>12</ele>
+        <time>2026-04-12T07:00:00Z</time>
+      </trkpt>
+      <trkpt lat="59.3303" lon="18.0786">
+        <ele>18</ele>
+        <time>2026-04-12T07:05:00Z</time>
+      </trkpt>
+      <trkpt lat="59.3313" lon="18.0886">
+        <ele>16</ele>
+        <time>2026-04-12T07:10:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

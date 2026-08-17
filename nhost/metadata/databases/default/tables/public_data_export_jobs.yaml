@@ -1,0 +1,50 @@
+table:
+  name: data_export_jobs
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - status
+        - error_summary
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - status
+        - storage_file_id
+        - error_summary
+        - created_at
+        - updated_at
+        - completed_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - status
+        - storage_file_id
+        - error_summary
+        - completed_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

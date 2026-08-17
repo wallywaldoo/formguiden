@@ -1,0 +1,47 @@
+table:
+  name: recommendations
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - generated_at
+        - rule_id
+        - action_key
+        - action_sv
+        - comparison_period_days
+        - completeness
+        - confidence
+        - disclaimer_key
+        - valid_until
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - generated_at
+        - rule_id
+        - action_key
+        - action_sv
+        - comparison_period_days
+        - completeness
+        - confidence
+        - disclaimer_key
+        - valid_until
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

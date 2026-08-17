@@ -1,0 +1,18 @@
+import type { FileKind } from "@/lib/import/detect";
+import type { ParseResult } from "@/lib/import/types";
+
+export type ImportProviderId = "garmin-file" | "garmin-api";
+
+export type ImportProviderAdapter = {
+  id: ImportProviderId;
+  detect(bytes: Uint8Array): FileKind | null;
+  parse(bytes: Uint8Array, context: { fileKind: FileKind }): ParseResult;
+  externalId(record: { externalId: string | null }): string | null;
+};
+
+export class NotEligibleError extends Error {
+  constructor(message = "Official Garmin API is not enabled.") {
+    super(message);
+    this.name = "NotEligibleError";
+  }
+}

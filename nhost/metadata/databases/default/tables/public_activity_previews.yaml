@@ -1,0 +1,69 @@
+table:
+  name: activity_previews
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - import_id
+        - import_file_id
+        - expires_at
+        - source
+        - external_id
+        - activity_type
+        - started_at
+        - ended_at
+        - duration_s
+        - duration_kind
+        - distance_m
+        - elevation_gain_m
+        - elevation_loss_m
+        - avg_pace_s_per_km
+        - avg_heart_rate_bpm
+        - max_heart_rate_bpm
+        - avg_cadence
+        - calories_kcal
+        - training_load
+        - notes
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - import_id
+        - import_file_id
+        - expires_at
+        - source
+        - external_id
+        - activity_type
+        - started_at
+        - ended_at
+        - duration_s
+        - duration_kind
+        - distance_m
+        - elevation_gain_m
+        - elevation_loss_m
+        - avg_pace_s_per_km
+        - avg_heart_rate_bpm
+        - max_heart_rate_bpm
+        - avg_cadence
+        - calories_kcal
+        - training_load
+        - notes
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

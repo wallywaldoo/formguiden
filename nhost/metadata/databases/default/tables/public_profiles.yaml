@@ -1,0 +1,62 @@
+table:
+  name: profiles
+  schema: public
+object_relationships:
+  - name: user_preferences
+    using:
+      manual_configuration:
+        remote_table:
+          schema: public
+          name: user_preferences
+        column_mapping:
+          user_id: user_id
+array_relationships:
+  - name: goals
+    using:
+      manual_configuration:
+        remote_table:
+          schema: public
+          name: goals
+        column_mapping:
+          user_id: user_id
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - display_name
+        - date_of_birth
+        - sex_at_birth
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - display_name
+        - date_of_birth
+        - sex_at_birth
+        - onboarding_completed_at
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - display_name
+        - date_of_birth
+        - sex_at_birth
+        - onboarding_completed_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id

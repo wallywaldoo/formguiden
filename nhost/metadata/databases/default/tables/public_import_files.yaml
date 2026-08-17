@@ -1,0 +1,71 @@
+table:
+  name: import_files
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - import_id
+        - storage_file_id
+        - original_filename
+        - declared_mime_type
+        - detected_kind
+        - byte_size
+        - sha256
+        - status
+        - parent_file_id
+        - zip_entry_path
+        - error_code
+        - error_message
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - import_id
+        - storage_file_id
+        - original_filename
+        - declared_mime_type
+        - detected_kind
+        - byte_size
+        - sha256
+        - status
+        - parent_file_id
+        - zip_entry_path
+        - error_code
+        - error_message
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - detected_kind
+        - status
+        - sha256
+        - error_code
+        - error_message
+        - parent_file_id
+        - zip_entry_path
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

@@ -1,0 +1,147 @@
+table:
+  name: files
+  schema: storage
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        _and:
+          - bucket_id:
+              _eq: garmin-imports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      set:
+        uploaded_by_user_id: x-hasura-user-id
+      columns:
+        - id
+        - bucket_id
+        - name
+        - size
+        - mime_type
+        - metadata
+  - role: user
+    permission:
+      check:
+        _and:
+          - bucket_id:
+              _eq: user-exports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      set:
+        uploaded_by_user_id: x-hasura-user-id
+      columns:
+        - id
+        - bucket_id
+        - name
+        - size
+        - mime_type
+        - metadata
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - created_at
+        - updated_at
+        - bucket_id
+        - name
+        - size
+        - mime_type
+        - etag
+        - is_uploaded
+        - uploaded_by_user_id
+        - metadata
+      filter:
+        _and:
+          - bucket_id:
+              _eq: garmin-imports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      allow_aggregations: false
+  - role: user
+    permission:
+      columns:
+        - id
+        - created_at
+        - updated_at
+        - bucket_id
+        - name
+        - size
+        - mime_type
+        - etag
+        - is_uploaded
+        - uploaded_by_user_id
+        - metadata
+      filter:
+        _and:
+          - bucket_id:
+              _eq: user-exports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - bucket_id
+        - etag
+        - is_uploaded
+        - metadata
+        - mime_type
+        - name
+        - size
+      filter:
+        _and:
+          - bucket_id:
+              _eq: garmin-imports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      check:
+        _and:
+          - bucket_id:
+              _eq: garmin-imports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      set:
+        uploaded_by_user_id: x-hasura-user-id
+  - role: user
+    permission:
+      columns:
+        - bucket_id
+        - etag
+        - is_uploaded
+        - metadata
+        - mime_type
+        - name
+        - size
+      filter:
+        _and:
+          - bucket_id:
+              _eq: user-exports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      check:
+        _and:
+          - bucket_id:
+              _eq: user-exports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+      set:
+        uploaded_by_user_id: x-hasura-user-id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        _and:
+          - bucket_id:
+              _eq: garmin-imports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+  - role: user
+    permission:
+      filter:
+        _and:
+          - bucket_id:
+              _eq: user-exports
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id

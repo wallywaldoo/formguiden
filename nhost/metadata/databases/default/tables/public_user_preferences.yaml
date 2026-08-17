@@ -1,0 +1,64 @@
+table:
+  name: user_preferences
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - timezone
+        - locale
+        - week_starts_on
+        - distance_unit
+        - mass_unit
+        - elevation_unit
+        - volume_unit
+        - temperature_unit
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - user_id
+        - timezone
+        - locale
+        - week_starts_on
+        - distance_unit
+        - mass_unit
+        - elevation_unit
+        - volume_unit
+        - temperature_unit
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - timezone
+        - locale
+        - week_starts_on
+        - distance_unit
+        - mass_unit
+        - elevation_unit
+        - volume_unit
+        - temperature_unit
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

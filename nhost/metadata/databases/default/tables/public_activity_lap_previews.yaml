@@ -1,0 +1,48 @@
+table:
+  name: activity_lap_previews
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - import_id
+        - activity_preview_id
+        - lap_index
+        - kind
+        - started_at
+        - duration_s
+        - distance_m
+        - avg_pace_s_per_km
+        - avg_heart_rate_bpm
+        - elevation_gain_m
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - import_id
+        - activity_preview_id
+        - lap_index
+        - kind
+        - started_at
+        - duration_s
+        - distance_m
+        - avg_pace_s_per_km
+        - avg_heart_rate_bpm
+        - elevation_gain_m
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

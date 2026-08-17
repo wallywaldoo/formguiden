@@ -1,0 +1,60 @@
+table:
+  name: strength_sets
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - session_id
+        - set_index
+        - exercise_name
+        - repetitions
+        - mass_kg
+        - rpe
+        - notes
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - session_id
+        - set_index
+        - exercise_name
+        - repetitions
+        - mass_kg
+        - rpe
+        - notes
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - set_index
+        - exercise_name
+        - repetitions
+        - mass_kg
+        - rpe
+        - notes
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

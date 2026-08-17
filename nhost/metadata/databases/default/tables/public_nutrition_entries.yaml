@@ -1,0 +1,73 @@
+table:
+  name: nutrition_entries
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - eaten_at
+        - meal_type
+        - description
+        - energy_kcal
+        - protein_g
+        - carbohydrate_g
+        - fat_g
+        - fiber_g
+        - provenance
+        - ai_estimation_request_id
+        - notes
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - eaten_at
+        - meal_type
+        - description
+        - energy_kcal
+        - protein_g
+        - carbohydrate_g
+        - fat_g
+        - fiber_g
+        - provenance
+        - ai_estimation_request_id
+        - notes
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - eaten_at
+        - meal_type
+        - description
+        - energy_kcal
+        - protein_g
+        - carbohydrate_g
+        - fat_g
+        - fiber_g
+        - provenance
+        - ai_estimation_request_id
+        - notes
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id

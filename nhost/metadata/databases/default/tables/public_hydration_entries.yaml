@@ -1,0 +1,55 @@
+table:
+  name: hydration_entries
+  schema: public
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: x-hasura-user-id
+      columns:
+        - consumed_at
+        - volume_ml
+        - beverage_type
+        - caffeine_mg
+        - notes
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - id
+        - consumed_at
+        - volume_ml
+        - beverage_type
+        - caffeine_mg
+        - notes
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: false
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - consumed_at
+        - volume_ml
+        - beverage_type
+        - caffeine_mg
+        - notes
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
