@@ -178,7 +178,6 @@ export const INSERT_GOAL_SNAPSHOT = /* GraphQL */ `
     $weekly_run_duration_s: Int
     $weekly_strength_sessions: Int
     $weekly_strength_duration_s: Int
-    $notes: String
   ) {
     insert_goal_snapshots_one(
       object: {
@@ -194,7 +193,6 @@ export const INSERT_GOAL_SNAPSHOT = /* GraphQL */ `
         weekly_run_duration_s: $weekly_run_duration_s
         weekly_strength_sessions: $weekly_strength_sessions
         weekly_strength_duration_s: $weekly_strength_duration_s
-        notes: $notes
       }
     ) {
       id

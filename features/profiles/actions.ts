@@ -273,6 +273,7 @@ export async function updateGoalAction(
     weeklyStrengthDuration: parsed.data.weeklyStrengthDuration,
     notes: parsed.data.notes,
   });
+  const { notes: _notes, ...goalSnapshot } = goal;
 
   try {
     const existing =
@@ -284,13 +285,13 @@ export async function updateGoalAction(
       }>(INSERT_GOAL, { status: "active", ...goal });
       await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
         goal_id: inserted.insert_goals_one.id,
-        ...goal,
+        ...goalSnapshot,
       });
     } else {
       await graphqlRequest(UPDATE_GOAL, { id: current.id, ...goal });
       await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
         goal_id: current.id,
-        ...goal,
+        ...goalSnapshot,
       });
     }
   } catch (error) {
