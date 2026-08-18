@@ -98,6 +98,7 @@ export async function completeOnboardingAction(
     weeklyStrengthSessions: parsed.data.weeklyStrengthSessions,
     weeklyStrengthDuration: parsed.data.weeklyStrengthDuration,
   });
+  const { notes: _onboardingNotes, ...goalSnapshot } = goal;
 
   if (goal.race_distance_m <= 0) {
     return { error: "Ange en giltig loppdistans." };
@@ -157,7 +158,7 @@ export async function completeOnboardingAction(
       await graphqlRequest(UPDATE_GOAL, { id: existingGoal.id, ...goal });
       await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
         goal_id: existingGoal.id,
-        ...goal,
+        ...goalSnapshot,
       });
     } else {
       const inserted = await graphqlRequest<{
@@ -165,7 +166,7 @@ export async function completeOnboardingAction(
       }>(INSERT_GOAL, { status: "active", ...goal });
       await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
         goal_id: inserted.insert_goals_one.id,
-        ...goal,
+        ...goalSnapshot,
       });
     }
 
