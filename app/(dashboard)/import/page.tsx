@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -16,12 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ImportUploader } from "@/features/imports/import-uploader";
 import { IMPORT_STATUS_LABEL } from "@/features/imports/labels";
+import { CatchUpDropzone } from "@/features/sync/catch-up-dropzone";
+import { RitualCards } from "@/features/sync/ritual-cards";
 import { graphqlRequest } from "@/lib/graphql/client";
 import { LIST_IMPORTS } from "@/lib/graphql/queries/imports";
 
-export default async function ImportPage() {
+export default async function ImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const params = await searchParams;
   let imports: Array<{
     id: string;
     status: string;
@@ -44,34 +51,41 @@ export default async function ImportPage() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Import</h1>
-        <p className="text-muted-foreground">
-          Ladda upp filer du själv exporterat från Garmin Connect. Det finns
-          ingen “Connect Garmin”-knapp.
+      <div className="space-y-3">
+        <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
+          Efter passet
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
+          Klockan hemma. Formkurvan i telefonen.
+        </h1>
+        <p className="max-w-2xl text-muted-foreground text-pretty">
+          Garmin Connect är källan. Formkurvan är din privata coach. Du
+          exporterar, släpper, och vi tar bara det som är nytt — ungefär som
+          Strava, utan att be om ditt Garmin-lösenord.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ny import</CardTitle>
-          <CardDescription>
-            I Garmin Connect: öppna aktiviteten → exportera Original/FIT, TCX
-            eller GPX. ZIP med flera filer går bra inom gränserna.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ImportUploader />
-        </CardContent>
-      </Card>
+      {params.error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{params.error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <CatchUpDropzone />
+      <RitualCards />
 
       <Card>
         <CardHeader>
-          <CardTitle>Historik</CardTitle>
+          <CardTitle>Tidigare inhämtningar</CardTitle>
+          <CardDescription>
+            Varje släpp är en händelse. Dubbletter räknas, inget skrivs över.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {imports.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Inga importer ännu.</p>
+            <p className="text-sm text-muted-foreground">
+              Inget inne ännu. Första filen är den som startar säsongen.
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -100,8 +114,8 @@ export default async function ImportPage() {
                     </TableCell>
                     <TableCell>{item.file_count}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {item.committed_count} sparade · {item.duplicate_count}{" "}
-                      dubbletter · {item.failed_count} fel
+                      {item.committed_count} nya · {item.duplicate_count} redan
+                      inne · {item.failed_count} fel
                     </TableCell>
                   </TableRow>
                 ))}

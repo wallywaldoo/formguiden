@@ -57,6 +57,7 @@ export const GET_DASHBOARD = /* GraphQL */ `
       id
       status
       created_at
+      committed_at
       committed_count
       file_count
     }

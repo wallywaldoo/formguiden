@@ -74,3 +74,18 @@ export function buildGoalPayload(input: {
     notes: input.notes?.trim() ? input.notes.trim() : null,
   };
 }
+
+export function goalSnapshotFields(goal: GoalPayload) {
+  return {
+    race_type: goal.race_type,
+    race_distance_m: goal.race_distance_m,
+    race_date: goal.race_date,
+    target_duration_s: goal.target_duration_s,
+    target_pace_s_per_km: goal.target_pace_s_per_km,
+    target_mass_kg: goal.target_mass_kg,
+    weekly_run_distance_m: goal.weekly_run_distance_m,
+    weekly_run_duration_s: goal.weekly_run_duration_s,
+    weekly_strength_sessions: goal.weekly_strength_sessions,
+    weekly_strength_duration_s: goal.weekly_strength_duration_s,
+  };
+}

@@ -62,7 +62,7 @@ Steps (one primary action each):
 1. **Privacy** — acknowledge that this is not medical advice; health data is private to this account; Garmin files are user-exported.
 2. **Profile** — display name, timezone, distance/weight/temperature display units.
 3. **Goals** — race type, date, finish time; show derived pace; weekly running and strength; optional target weight.
-4. **Done** — enter `/overview`. Empty dashboard with one CTA: “Importera Garmin-fil”.
+4. **Done** — enter `/overview`. Empty dashboard with one CTA: “Hämta in första passet”.
 
 The user can skip optional fields. Race date and finish time are required to compute pace; if finish time is omitted, pace stays empty.
 
@@ -76,22 +76,21 @@ On load (Server Component):
 
 Quick actions open compact sheets/dialogs for food, hydration, weight, strength.
 
-## 5. Garmin import
+## 5. Garmin catch-up (“Efter passet”)
 
 See [data-import-strategy.md](data-import-strategy.md) for processing. User-visible flow:
 
-1. User opens `/import`.
-2. Reads short instructions: export from Garmin Connect (activity gear menu: Original/FIT, TCX, GPX; or a ZIP of those files). No “Connect Garmin” button.
-3. Selects files (client validates extension **as a hint only**).
-4. Files upload **directly to Nhost Storage** bucket `garmin-imports` with the user session. The app does not trust client `user_id` or `uploaded_by_user_id`.
-5. Server creates `data_imports` + `import_files` rows from Storage metadata after verifying `uploaded_by_user_id` matches the session user.
-6. Server computes SHA-256, magic-byte type, size. Duplicates (`user_id` + checksum) are marked and not re-parsed as new activities.
-7. A bounded worker parses into **preview** tables. Status polling on the import page.
-8. User reviews preview: activities, health days, warnings, partial failures.
-9. User confirms. Server copies preview → canonical tables in a transaction scoped to that import and user.
-10. Import history shows status, file count, inserted/skipped/failed, and timestamps.
+1. User opens `/import` (“Efter passet”) or drops a file anywhere in the dashboard.
+2. Reads three rituals: after a run (single FIT), Sunday catch-up (ZIP), first-time history.
+3. Files upload **directly to Nhost Storage** bucket `garmin-imports` with the user session.
+4. Server creates `data_imports` + `import_files` rows after verifying `uploaded_by_user_id`.
+5. SHA-256 + magic-byte type. Duplicates (`user_id` + checksum) are marked and skipped — re-dropping a weekly ZIP is the honest “sync”.
+6. A bounded worker parses into **preview** tables.
+7. User reviews preview and confirms.
+8. `/import/:id/landed` shows a recap of what actually landed.
+9. Installed PWA can receive files via Web Share Target at `POST /share`.
 
-The user can abandon a preview. Unconfirmed preview rows expire (default 7 days) and are deleted; original files remain until the user deletes the import or the account.
+There is no “Connect Garmin” OAuth. Official Garmin API remains a future adapter.
 
 ## 6. Running, recovery, body
 

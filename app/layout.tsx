@@ -19,7 +19,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Formkurvan",
-  description: "Privat hälso- och halvmaratonstracker.",
+  description: "Kör. Dela. Formkurvan tar hand om resten.",
+  appleWebApp: {
+    capable: true,
+    title: "Formkurvan",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

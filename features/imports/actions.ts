@@ -310,8 +310,10 @@ export async function confirmImportAction(
 
     revalidatePath("/import");
     revalidatePath(`/import/${parsedId.data}`);
+    revalidatePath(`/import/${parsedId.data}/landed`);
     revalidatePath("/overview");
     revalidatePath("/running");
+    revalidatePath("/report");
     return { importId: parsedId.data };
   } catch (error) {
     return {

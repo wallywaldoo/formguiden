@@ -89,6 +89,34 @@ export const GET_IMPORT = /* GraphQL */ `
   }
 `;
 
+export const GET_IMPORT_LANDING = /* GraphQL */ `
+  query GetImportLanding($id: uuid!) {
+    data_imports_by_pk(id: $id) {
+      id
+      status
+      committed_count
+      duplicate_count
+      committed_at
+    }
+    activities(
+      where: { import_id: { _eq: $id } }
+      order_by: { started_at: desc }
+    ) {
+      id
+      activity_type
+      started_at
+      distance_m
+      avg_pace_s_per_km
+    }
+    daily_health_metrics(where: { import_id: { _eq: $id } }) {
+      id
+    }
+    body_measurements(where: { import_id: { _eq: $id } }) {
+      id
+    }
+  }
+`;
+
 export const LIST_IMPORTS = /* GraphQL */ `
   query ListImports {
     data_imports(order_by: { created_at: desc }, limit: 30) {

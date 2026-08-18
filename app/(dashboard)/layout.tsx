@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/navigation/app-shell";
 import { DeletionGate } from "@/features/privacy/deletion-gate";
+import { DashboardDropCatch } from "@/features/sync/dashboard-drop-catch";
 import { graphqlRequest } from "@/lib/graphql/client";
 import { GET_PENDING_DELETION } from "@/lib/graphql/queries/coaching";
 import { GET_ONBOARDING_STATE } from "@/lib/graphql/queries/profile";
@@ -49,7 +50,9 @@ export default async function DashboardLayout({
     <AppShell
       displayName={session.user.displayName || session.user.email || "Konto"}
     >
-      <DeletionGate pending={deletionPending}>{children}</DeletionGate>
+      <DeletionGate pending={deletionPending}>
+        <DashboardDropCatch>{children}</DashboardDropCatch>
+      </DeletionGate>
     </AppShell>
   );
 }

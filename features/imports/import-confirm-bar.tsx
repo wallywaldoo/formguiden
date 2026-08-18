@@ -42,7 +42,7 @@ export function ImportConfirmBar({
       setError(result.error);
       return;
     }
-    router.refresh();
+    router.push(`/import/${importId}/landed`);
   }
 
   async function abandon() {
@@ -60,7 +60,7 @@ export function ImportConfirmBar({
     <div className="flex flex-col gap-3 sm:flex-row">
       {canConfirm ? (
         <Button onClick={() => void confirm()} disabled={busy}>
-          Bekräfta import
+          Bekräfta och landa
         </Button>
       ) : null}
       {canAbandon ? (

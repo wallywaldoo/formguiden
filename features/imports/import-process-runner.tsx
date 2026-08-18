@@ -70,8 +70,8 @@ export function ImportProcessRunner({
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            Tolkar filer i korta steg. Du kan stänga fliken och fortsätta
-            senare.
+            Tolkar klockan i korta steg. Du kan stänga fliken — öppna
+            inhämtningen igen så fortsätter Formkurvan.
           </p>
           <Progress value={Math.min(95, 12 + ticks * 8)} />
         </>

@@ -29,17 +29,17 @@ export function primaryAction(input: {
   if (runFamilyActivities(input.activities).length === 0) {
     return {
       href: "/import",
-      label: "Importera Garmin-fil",
+      label: "Hämta in första passet",
       reason:
-        "Inga löppass ännu. Exportera FIT, TCX, GPX eller CSV från Garmin Connect.",
+        "Inga löppass ännu. Exportera FIT från Garmin Connect och släpp filen — Formkurvan tar det härifrån.",
     };
   }
   if ((input.completeness.value ?? 0) < 0.4) {
     return {
       href: "/import",
-      label: "Komplettera med fler filer",
+      label: "Hämta ikapp klockan",
       reason:
-        "Flera serier saknas. Sömn och HRV finns oftast i FIT-hälsoexport.",
+        "Flera serier saknas. Sömn och HRV finns oftast i FIT-hälsoexport. Dubbletter hoppas över.",
     };
   }
   if ((input.paceGap.value ?? 0) > 15) {

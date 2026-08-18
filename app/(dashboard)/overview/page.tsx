@@ -22,6 +22,7 @@ import { IMPORT_STATUS_LABEL } from "@/features/imports/labels";
 import { QuickLogActions } from "@/features/logging/quick-log-actions";
 import { RecommendationCard } from "@/features/recommendations/recommendation-card";
 import { ensureFreshRecommendation } from "@/features/recommendations/service";
+import { CatchUpHero } from "@/features/sync/catch-up-hero";
 import { isNutritionAiEnabled } from "@/lib/ai/nutrition/create-estimator";
 import { computeDashboard } from "@/lib/analytics/dashboard";
 import { toDatetimeLocal } from "@/lib/analytics/dates";
@@ -109,6 +110,12 @@ export default async function OverviewPage() {
           Ett primärt nästa steg. Saknade värden lämnas tomma.
         </p>
       </div>
+
+      <CatchUpHero
+        lastActivityAt={activities[0]?.startedAt ?? null}
+        now={now}
+        timeZone={context.timeZone}
+      />
 
       {recommendation ? (
         <RecommendationCard recommendation={recommendation} />
@@ -233,7 +240,7 @@ export default async function OverviewPage() {
           {activities.length === 0 ? (
             <DataEmptyState
               title="Ingen löpning ännu"
-              description="Exportera Original/FIT från Garmin Connect och importera filen."
+              description="Exportera Original/FIT från Garmin Connect och släpp filen här."
             />
           ) : (
             <DistanceRangeChart
@@ -249,11 +256,13 @@ export default async function OverviewPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Senaste importer</CardTitle>
+          <CardTitle>Senaste inhämtningar</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {data.data_imports.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Inga importer ännu.</p>
+            <p className="text-sm text-muted-foreground">
+              Inga inhämtningar ännu.
+            </p>
           ) : (
             data.data_imports.map((item) => (
               <div
@@ -321,6 +330,7 @@ type DashboardPayload = {
     status: string;
     created_at: string;
     committed_count: number;
+    committed_at: string | null;
     file_count: number;
   }>;
 };

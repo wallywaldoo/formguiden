@@ -299,7 +299,7 @@ export const RECOMMENDATION_RULES: Rule[] = [
       return {
         ruleId: "data_completeness_import",
         actionKey: "import_more_data",
-        actionSv: "Importera fler Garmin-filer",
+        actionSv: "Hämta in fler Garmin-filer",
         href: "/import",
         comparisonPeriodDays: 90,
         completeness: value,

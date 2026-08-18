@@ -56,7 +56,7 @@ export default async function ImportDetailPage({
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Import</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Inhämtning</h1>
         <p className="text-muted-foreground">
           {new Date(item.created_at).toLocaleString("sv-SE")}
         </p>

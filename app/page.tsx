@@ -14,12 +14,12 @@ export default async function HomePage() {
           Formkurvan
         </p>
         <h1 className="text-4xl font-semibold tracking-tight">
-          Din löpning, återhämtning och form. Enkelt och privat.
+          Kör. Kom hem. Se formen.
         </h1>
         <p className="text-lg text-muted-foreground">
-          Importera Garmin-filer du själv exporterat. Sätt mål. Se vad datan
-          faktiskt visar — utan medicinska påståenden och utan att dela med
-          någon annan.
+          Formkurvan är din privata coach. Du släpper Garmin-filen efter passet
+          — vi tar bara det som är nytt. Inget lösenord till Garmin, ingen data
+          som delas med någon annan.
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">

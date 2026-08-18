@@ -24,7 +24,7 @@ const links = [
   { href: "/nutrition", label: "Kost" },
   { href: "/strength", label: "Styrka" },
   { href: "/goals", label: "Mål" },
-  { href: "/import", label: "Import" },
+  { href: "/import", label: "Efter passet" },
   { href: "/settings/profile", label: "Profil" },
   { href: "/settings/privacy", label: "Integritet" },
   { href: "/settings/integrations", label: "Integrationer" },

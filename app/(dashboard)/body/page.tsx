@@ -137,7 +137,7 @@ export default async function BodyPage() {
               title="Ingen vikt ännu"
               description="Logga manuellt ovan, eller importera en FIT/CSV som innehåller mass_kg."
               href="/import"
-              action="Importera Garmin-fil"
+              action="Hämta in pass"
             />
           ) : (
             <LineMetricChart data={series} dataKey="massKg" label="kg" />

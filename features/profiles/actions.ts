@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { buildGoalPayload } from "@/features/goals/map-goal";
+import {
+  buildGoalPayload,
+  goalSnapshotFields,
+} from "@/features/goals/map-goal";
 import { graphqlRequest } from "@/lib/graphql/client";
 import {
   COMPLETE_ONBOARDING,
@@ -98,7 +101,7 @@ export async function completeOnboardingAction(
     weeklyStrengthSessions: parsed.data.weeklyStrengthSessions,
     weeklyStrengthDuration: parsed.data.weeklyStrengthDuration,
   });
-  const { notes: _onboardingNotes, ...goalSnapshot } = goal;
+  const goalSnapshot = goalSnapshotFields(goal);
 
   if (goal.race_distance_m <= 0) {
     return { error: "Ange en giltig loppdistans." };
@@ -274,7 +277,7 @@ export async function updateGoalAction(
     weeklyStrengthDuration: parsed.data.weeklyStrengthDuration,
     notes: parsed.data.notes,
   });
-  const { notes: _notes, ...goalSnapshot } = goal;
+  const goalSnapshot = goalSnapshotFields(goal);
 
   try {
     const existing =

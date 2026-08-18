@@ -13,7 +13,7 @@ export function DataEmptyState({
   title,
   description,
   href = "/import",
-  action = "Importera Garmin-fil",
+  action = "Hämta in pass",
 }: {
   title: string;
   description: string;
