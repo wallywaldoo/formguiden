@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { IMPORT_STATUS_LABEL } from "@/features/imports/labels";
 import { CatchUpDropzone } from "@/features/sync/catch-up-dropzone";
+import { GarminDbNote } from "@/features/sync/garmindb-note";
 import { RitualCards } from "@/features/sync/ritual-cards";
 import { graphqlRequest } from "@/lib/graphql/client";
 import { LIST_IMPORTS } from "@/lib/graphql/queries/imports";
@@ -73,6 +74,7 @@ export default async function ImportPage({
 
       <CatchUpDropzone />
       <RitualCards />
+      <GarminDbNote />
 
       <Card>
         <CardHeader>

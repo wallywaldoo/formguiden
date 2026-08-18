@@ -10,6 +10,7 @@ This document is a design, not an implementation. No paid queue or processing se
 - Never ask for Garmin passwords.
 - Never use unofficial Garmin authentication libraries.
 - Never display a misleading “Connect Garmin” OAuth flow.
+- Never accept, store, proxy, or log any Garmin credential, session, token, or configuration file — including files a third-party tool wrote on the user's machine.
 - Never trust filenames, MIME types, archive contents, or client-provided user IDs.
 - Validate type from **magic bytes** and parser success, not extensions.
 - Calculate a **SHA-256** checksum of the raw bytes.
@@ -40,6 +41,8 @@ CSV support in the MVP covers:
 
 Official Garmin API access is **not** used.
 
+**GarminDB exports** are a separate, opt-in compatibility path designed in [garmindb-compatibility.md](garmindb-compatibility.md) (Phase 6, implemented). GarminDB runs on the user's own computer, outside our trust boundary; we accept only its `garmin.db` output and reject every credential, session, identity, and log file it produces.
+
 Sources:
 
 - [Exporting Files from Garmin Connect (Strava Help, describes Garmin Connect UI)](https://support.strava.com/en-us/articles/15402167-exporting-files-from-garmin-connect)
@@ -56,11 +59,14 @@ lib/import/
     types.ts               # ImportProviderAdapter
     garmin-file.ts         # MVP adapter
     garmin-api.ts          # stub: throws NotEligibleError
+    garmindb.ts            # Phase 6 — GarminDbImportAdapter
   fit/
   tcx/
   gpx/
   csv/
   zip/
+  garmindb/                # GarminDB garmin.db adapter
+  credentials/             # Phase 6 — content-based secret scan
   normalize.ts
   preview.ts
   commit.ts
@@ -68,22 +74,23 @@ lib/import/
 
 `ImportProviderAdapter`:
 
-- `id: "garmin-file" | "garmin-api" | ...`
+- `id: "garmin-file" | "garmin-api" | "garmindb"`
 - `detect(bytes): FileKind | null`
 - `parse(bytes, context): ParseResult` (canonical records + warnings)
 - `externalId(record): string | null`
 
-The Garmin API adapter exists only as a typed stub and is not wired to any UI.
+The Garmin API adapter exists only as a typed stub and is not wired to any UI. The GarminDB adapter does not exist yet; it is specified in [garmindb-compatibility.md](garmindb-compatibility.md) and awaits owner approval.
 
 ## 4. Supported formats
 
-| Kind | Detection                                     | Typical content                      | Canonical mapping                          |
-| ---- | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
-| FIT  | Header `.FIT` at offset 8                     | Activities, sometimes wellness/sleep | activities, laps, some daily metrics       |
-| TCX  | XML TrainingCenterDatabase                    | Activities with HR/GPS               | activities, laps                           |
-| GPX  | XML gpx                                       | Track points; often no HR            | activities (distance/time/elevation)       |
-| CSV  | Text after ZIP/XML/FIT rejected; header sniff | Summaries                            | activities or body/health if columns match |
-| ZIP  | `PK` magic                                    | Nested supported files               | Recurse with limits                        |
+| Kind   | Detection                                     | Typical content                      | Canonical mapping                          |
+| ------ | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| FIT    | Header `.FIT` at offset 8                     | Activities, sometimes wellness/sleep | activities, laps, some daily metrics       |
+| TCX    | XML TrainingCenterDatabase                    | Activities with HR/GPS               | activities, laps                           |
+| GPX    | XML gpx                                       | Track points; often no HR            | activities (distance/time/elevation)       |
+| CSV    | Text after ZIP/XML/FIT rejected; header sniff | Summaries                            | activities or body/health if columns match |
+| ZIP    | `PK` magic                                    | Nested supported files               | Recurse with limits                        |
+| SQLite | `SQLite format 3\0` + GarminDB fingerprint    | GarminDB `garmin.db` only            | daily health, body measurements — Phase 6  |
 
 FIT parsing library: official **`@garmin/fitsdk` 21.213.0** (Garmin FIT Protocol License; internal product use). Pure JavaScript, no native addons.
 
@@ -252,7 +259,30 @@ Confirm may proceed with a subset. The import is `partial` if any file failed.
 
 Every import writes `audit_events` with action, actor `user_id`, import id, checksums, and counts. No file bytes, no pre-signed URLs, no access tokens.
 
-## 11. Future official API
+## 11. GarminDB compatibility path (Phase 6)
+
+Full design: [garmindb-compatibility.md](garmindb-compatibility.md).
+
+GarminDB is a GPL-2.0 Python tool that users run themselves. It is **outside our trust boundary**. We add compatibility with one of its output files; we do not run it, embed it, depend on it, or handle any credential it uses.
+
+| Decision        | Value                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| Accepted input  | `garmin.db` only (schema version pinned), standalone or in a flat ZIP                                        |
+| Rejected input  | Config, session, token, identity, and log files; all other GarminDB databases                                |
+| Activities      | **Not** from SQLite — users drag FIT files from `HealthData/FitFiles/Activities/` into the existing dropzone |
+| Engine          | `sql.js` (WASM), read-only, frozen SQL, no extensions, no `ATTACH`                                           |
+| Units           | Read `attributes.measurement_system`; **refuse** the import if absent                                        |
+| Source value    | `garmindb`                                                                                                   |
+| Durable storage | Only after validation and explicit user confirmation, via a quarantine bucket                                |
+
+Two additions to the general pipeline:
+
+1. **Content-based credential scanning** (`lib/import/credentials/`) runs on every candidate byte range before parsing or persistence, independent of filename. A match rejects the whole upload.
+2. **Quarantine-first storage.** Unvalidated bytes land in `garmindb-quarantine`, not `garmin-imports`. They are copied to the durable bucket only on user confirmation, and deleted otherwise.
+
+Tighter archive limits apply to this path than to general imports: depth 1, 20 entries, exactly one accepted member.
+
+## 12. Future official API
 
 When eligible:
 
@@ -261,7 +291,7 @@ When eligible:
 - Keep file import forever (users without API access, historical dumps).
 - Do not mix unofficial libraries into that path.
 
-## 12. Phase 2 test fixtures
+## 13. Phase 2 test fixtures
 
 `tests/import-fixtures/` includes TCX, GPX, CSV samples plus helpers that encode FIT via `@garmin/fitsdk` and build ZIP archives. Coverage includes truncated FIT, mixed ZIP, zip-bomb rejection, and a PNG with FIT-like naming.
 

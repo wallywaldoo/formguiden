@@ -102,4 +102,29 @@ describe("Hasura metadata authorization contract", () => {
     expect(insert?.columns).not.toContain("uploaded_by_user_id");
     expect(JSON.stringify(insert?.set ?? {})).toMatch(/x-hasura-user-id/i);
   });
+
+  it("scopes the GarminDB quarantine bucket to its owner like every other bucket", () => {
+    const files = byName["storage.files"];
+    for (const operation of ["insert", "select", "update", "delete"] as const) {
+      const permission = permissionFor(files, operation, "user");
+      const blob = JSON.stringify(permission);
+      expect(blob, `files ${operation}`).toContain("garmindb-quarantine");
+      expect(blob, `files ${operation}`).toContain("uploaded_by_user_id");
+    }
+  });
+
+  it("keeps import provenance readable but not writable by the client", () => {
+    const importFiles = byName["public.import_files"];
+    expect(permissionFor(importFiles, "select", "user")?.columns).toContain(
+      "source_provenance",
+    );
+    // Written server-side only, so a client cannot forge a unit system or
+    // schema version and make a bad import look trustworthy.
+    expect(permissionFor(importFiles, "insert", "user")?.columns).not.toContain(
+      "source_provenance",
+    );
+    expect(permissionFor(importFiles, "update", "user")?.columns).not.toContain(
+      "source_provenance",
+    );
+  });
 });

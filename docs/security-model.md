@@ -15,6 +15,15 @@ Never:
 - Let the client pick `admin` or any privileged role
 - Put `NHOST_ADMIN_SECRET`, database URLs, or AI keys in `NEXT_PUBLIC_*`
 - Use a client-provided Storage `uploaded_by_user_id`
+- Read an identity field out of imported data. `user_id` comes from the verified session and nothing else — not from an upload, not from a filename, not from a row inside an imported database.
+
+## 1a. Third-party credentials — absolute prohibition
+
+Formkurvan must never collect, receive, store, proxy, log, or process a user's Garmin username, password, MFA code, session cookie, OAuth token, `GarminConnectConfig.json`, or any other Garmin credential material.
+
+This holds even when a user tries to hand them over. Uploads are scanned by **content** for credential material and rejected before persistence — see §8.2 and [garmindb-compatibility.md](garmindb-compatibility.md) §3.3.
+
+There is no Garmin login form, no credential field, and no OAuth-looking flow anywhere in the application. Tools like GarminDB that do hold credentials run on the user's own machine, outside our trust boundary, and we never receive their configuration.
 
 Sources:
 
@@ -110,7 +119,7 @@ Do not expose `provider_payload` in list queries if it may contain serial number
 
 ## 6. Nhost Storage
 
-Bucket: `garmin-imports` (private).
+Buckets: `garmin-imports` (private, durable) and — Phase 6 — `garmindb-quarantine` (private, unvalidated landing zone, 24 h TTL).
 
 Uploader identity: **on** for upload and replace — `uploaded_by_user_id` prefilled from `X-Hasura-User-Id`. [Storage permissions](https://docs.nhost.io/products/storage/permissions/)
 
@@ -128,6 +137,21 @@ Download for parsing: server uses the **user session** Storage client, not the a
 Pre-signed URLs: expiration **30 s**, issued only after authorization, never stored, never logged. Prefer authenticated `getFile` for in-app preview when possible.
 
 GraphQL `files` / `buckets` tracking: users must not list other users' files. Do not grant select on all `storage.files` columns beyond what download requires; Nhost docs note download requires select on all columns — grant select **with the row filter**, not unfiltered.
+
+### 6.1 Quarantine bucket (Phase 6)
+
+Unvalidated bytes must not become durable artifacts. `garmindb-quarantine` holds an upload only until validation and user confirmation complete.
+
+| Rule            | Value                                                                      |
+| --------------- | -------------------------------------------------------------------------- |
+| Permissions     | Identical row filters to `garmin-imports`; `uploaded_by_user_id` prefilled |
+| Max size        | 25 MiB                                                                     |
+| On rejection    | Object deleted immediately; only a rejection audit record survives         |
+| On confirm      | Bytes copied to `garmin-imports`, quarantine object deleted                |
+| TTL             | 24 h sweep for abandoned uploads                                           |
+| Pre-signed URLs | Disabled — server-side authenticated reads only                            |
+
+Rationale for uploading before validating: Vercel request-body limits make streaming a 25 MiB file through a Route Handler impractical. The quarantine bucket preserves the guarantee that nothing unvalidated or unconfirmed is retained.
 
 ## 7. Server-only privileges
 
@@ -150,14 +174,78 @@ If a maintenance script uses the admin secret, it must take an explicit `user_id
 - Numeric ranges for weight, BP, RPE, etc.
 - Timezone must be a valid IANA name.
 
-## 9. Operational security (Starter)
+### 8.1 Uploads are untrusted input
+
+Filenames, extensions, MIME types, and archive entry paths are display strings. They never drive a decision. Classification comes from content.
+
+Archive entries are rejected for symlinks, hardlinks, path traversal (`..`, absolute paths, drive letters, backslashes, NUL), nested archives beyond the configured depth, compression ratios above threshold, and executable magic bytes (MZ, ELF, Mach-O, `#!`). Extraction is **in memory only** — the import path never writes an uploaded file to disk.
+
+### 8.2 Credential material scanning (Phase 6)
+
+Every candidate byte range is scanned before parsing and before durable persistence. A match rejects the whole upload.
+
+Probes are structural, not name-based: JSON key names matching credential patterns, a `credentials` object containing `user`, JWT/`Bearer`/private-key armour shapes, the `GarminConnectConfig.json` field fingerprint, and Garmin profile identity keys. Full probe list in [garmindb-compatibility.md](garmindb-compatibility.md) §3.3.
+
+Rejection errors are **category-level only** (`credential_material_detected`). They never echo the matched value, the key path, or any file content.
+
+### 8.3 Untrusted SQLite (Phase 6)
+
+An uploaded SQLite database is hostile input, not a data source to be trusted.
+
+| Control        | Rule                                                                            |
+| -------------- | ------------------------------------------------------------------------------- |
+| Engine         | `sql.js` — WASM, memory-isolated, built without loadable extensions             |
+| Native addons  | Forbidden                                                                       |
+| Mode           | Read-only. No writes, no `ATTACH`, no `PRAGMA` writes, no `load_extension`      |
+| SQL            | Frozen string literals with a fixed column allowlist. No user input reaches SQL |
+| Schema check   | Inspect `sqlite_master` first; reject triggers and virtual tables               |
+| View shadowing | An allowlisted table name must resolve to `type = 'table'`                      |
+| Size           | ≤ 25 MiB, checked before the bytes reach the engine                             |
+| Rows           | ≤ 50 000 per table, ≤ 200 000 per import, enforced via `LIMIT`                  |
+| Wall clock     | 15 s per slice, then abort                                                      |
+| Teardown       | `close()` in `finally`; bytes dropped before responding                         |
+
+No column outside the allowlist is read, so device serial numbers and any identity fields never enter the application.
+
+### 8.4 Import logging rules
+
+Never logged: file bytes, archive entry contents, matched credential values, credential-scan key paths, pre-signed URLs, access tokens, or third-party profile identifiers.
+
+Logged: import id, user id, checksum, detected kind, schema version, row counts, error **codes**, duration.
+
+## 9. Threat model
+
+Assets, in priority order: the user's health history, their Nhost session, and third-party credentials we intend never to hold.
+
+Trust boundaries: the browser is untrusted; uploaded files are untrusted; any tool the user runs locally (GarminDB, a watch, a spreadsheet) is outside our boundary and its output is untrusted input.
+
+| Threat                                                | Primary mitigation                                                                      | Verified by           |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------- |
+| Cross-tenant read/write                               | Hasura row filters on `user_id`; insert presets; denormalized ownership on child tables | §10 tests 4–14        |
+| Client forges `user_id` or role                       | JWT claims are authoritative; client headers ignored                                    | §10 tests 12–13       |
+| Session theft via XSS                                 | Strict CSP, sanitization, no second token copy; cookie is not HttpOnly by design (§3)   | Review, Phase 1       |
+| Credential material reaching our systems              | Content-based scanning; rejection before persistence; no credential UI                  | §8.2, §10 tests 15–17 |
+| Malicious upload exploiting a parser                  | WASM isolation, size/row/time ceilings, magic-byte gating                               | §8.3, import fixtures |
+| Resource exhaustion (zip bomb, row explosion)         | Ratio, entry, row, and wall-clock caps                                                  | §8.1, §8.3            |
+| Path traversal or symlink write                       | In-memory extraction only; entries rejected                                             | §8.1                  |
+| Unvalidated data becoming a durable artifact          | Quarantine bucket, delete on rejection                                                  | §6.1                  |
+| Secret leakage through logs or errors                 | Category-only error codes; §8.4 logging rules                                           | §10 test 18           |
+| Admin secret bypassing row permissions on a user path | User-session client for all user data; admin secret is CLI/maintenance only             | §7, build-time grep   |
+| Silent data corruption from ambiguous units           | Refuse import when the measurement system is unknown                                    | GarminDB test 24      |
+| Backend unavailable leaking internals                 | Wrapped errors, Swedish maintenance message                                             | Architecture §12      |
+
+Out of scope for the MVP threat model, documented rather than mitigated: a malicious Nhost or Vercel operator, physical access to the user's device, and compromise of the user's email account.
+
+Per-feature threat models live with their designs. GarminDB: [garmindb-compatibility.md](garmindb-compatibility.md) §8.
+
+## 10. Operational security (Starter)
 
 - Project may **pause after 7 days inactivity**. Handle 5xx/network errors without leaking internals.
 - **No automated backups** on Starter. Manual `pg_dump` + separate Storage sync is required before real users. Database dump **does not** include Garmin file bytes. [Backups](https://docs.nhost.io/products/database/backups)
 - Encryption at rest/transit is provided by Nhost; this does not replace row-level authorization.
 - Nhost HIPAA is **not** available (“coming soon” on their security page). Do not claim HIPAA.
 
-## 10. Automated authorization tests (minimum)
+## 11. Automated authorization tests (minimum)
 
 Framework: integration tests against local Nhost (`nhost up`) with two seeded users A and B plus anonymous.
 
@@ -181,13 +269,24 @@ Negative:
 13. `x-hasura-role: admin` fails for a normal user.
 14. GraphQL mutation inserting `uploaded_by_user_id` / file metadata cannot impersonate B.
 
-These tests are a Phase 1 deliverable for tables that exist then (`profiles`, `user_preferences`, `goals`, Storage), and expand in later phases.
+Content safety (Phase 6):
 
-## 11. Security review checkpoints
+15. Credential material is rejected standalone and inside an archive.
+16. The same credential file renamed to an accepted name is still rejected — content wins over filename.
+17. An identity file (Garmin profile JSON) is rejected.
+18. Rejection messages and logs contain no credential values, key paths, or file contents.
+19. A crafted `user_id` inside an uploaded database is ignored; rows belong to the session user.
+20. A cannot read, download, resume, confirm, or commit any of B's GarminDB import artifacts, in either bucket.
+21. Account deletion removes the user's quarantine objects, durable objects, and normalized rows.
 
-| Phase | Extra check                                                         |
-| ----- | ------------------------------------------------------------------- |
-| 1     | Cookie flags, env split, permission YAML in git, auth tests green   |
-| 2     | Storage tests, magic-byte tests, no admin-secret parse path         |
-| 4     | AI: no extra health fields in prompts; rate limit; no key in client |
-| 5     | Export/delete completeness; incident notes; backup restore drill    |
+These tests are a Phase 1 deliverable for tables that exist then (`profiles`, `user_preferences`, `goals`, Storage), and expand in later phases. Tests 15–21 activate with Phase 6; the full list is in [garmindb-compatibility.md](garmindb-compatibility.md) §10.
+
+## 12. Security review checkpoints
+
+| Phase | Extra check                                                                                     |
+| ----- | ----------------------------------------------------------------------------------------------- |
+| 1     | Cookie flags, env split, permission YAML in git, auth tests green                               |
+| 2     | Storage tests, magic-byte tests, no admin-secret parse path                                     |
+| 4     | AI: no extra health fields in prompts; rate limit; no key in client                             |
+| 5     | Export/delete completeness; incident notes; backup restore drill                                |
+| 6     | Credential scan coverage, SQLite sandbox limits, quarantine lifecycle, no GarminDB code in tree |

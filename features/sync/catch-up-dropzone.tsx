@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const FILE_ACCEPT =
-  ".fit,.tcx,.gpx,.csv,.zip,application/zip,application/gpx+xml,text/csv";
+  ".fit,.tcx,.gpx,.csv,.zip,.db,application/zip,application/gpx+xml,text/csv";
 
 function filesFromList(list: FileList | File[] | null | undefined): File[] {
   return Array.from(list ?? []).filter((file) => file.size > 0);

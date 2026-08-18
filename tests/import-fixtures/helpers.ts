@@ -59,3 +59,54 @@ export function zipFromEntries(
 ): Uint8Array {
   return zipSync(entries);
 }
+
+const encoder = new TextEncoder();
+
+export function jsonBytes(value: unknown): Uint8Array {
+  return encoder.encode(JSON.stringify(value, null, 2));
+}
+
+/**
+ * Shape of GarminDB's GarminConnectConfig.json. Credentials are deliberately
+ * invalid so a leak in test output is obvious and harmless.
+ */
+export function garminConnectConfigBytes(): Uint8Array {
+  return jsonBytes({
+    db: { type: "sqlite" },
+    garmin: { domain: "garmin.com" },
+    credentials: {
+      user: "user@example.invalid",
+      secure_password: false,
+      password: "not-a-real-password",
+      password_file: null,
+    },
+    data: { weight_start_date: "12/31/2019" },
+    directories: { relative_to_home: true, base_dir: "HealthData" },
+    enabled_stats: { monitoring: true, sleep: true, weight: true },
+    settings: { metric: false },
+  });
+}
+
+export function personalInformationBytes(): Uint8Array {
+  return jsonBytes({
+    userInfo: { birthDate: "1990-01-01", genderType: "MALE" },
+    userProfileId: 1234567,
+    displayName: "example-user",
+  });
+}
+
+export function socialProfileBytes(): Uint8Array {
+  return jsonBytes({
+    id: 1234567,
+    profileId: 1234567,
+    displayName: "example-user",
+    fullName: "Example User",
+    profileImageUrlLarge: "https://example.invalid/large.png",
+  });
+}
+
+export function machOBytes(): Uint8Array {
+  const bytes = new Uint8Array(64);
+  bytes.set([0xcf, 0xfa, 0xed, 0xfe], 0);
+  return bytes;
+}

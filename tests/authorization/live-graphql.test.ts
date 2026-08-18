@@ -161,6 +161,119 @@ describe.skipIf(!live)(
       }
     });
 
+    it("does not return B's quarantined GarminDB uploads to A", async () => {
+      const result = await graphql(
+        jwtA,
+        /* GraphQL */ `
+          query Quarantine {
+            files(where: { bucket_id: { _eq: "garmindb-quarantine" } }) {
+              id
+              uploaded_by_user_id
+            }
+          }
+        `,
+      );
+      expect(result.errors).toBeUndefined();
+      const bProfile = await graphql(jwtB, SELECT_PROFILES);
+      const bId = (
+        (bProfile.data?.profiles ?? []) as Array<{ user_id: string }>
+      )[0]?.user_id;
+      if (!bId) {
+        return;
+      }
+      const files = (result.data?.files ?? []) as Array<{
+        uploaded_by_user_id: string;
+      }>;
+      expect(files.every((file) => file.uploaded_by_user_id !== bId)).toBe(
+        true,
+      );
+    });
+
+    it("rejects anonymous reads of the quarantine bucket", async () => {
+      const result = await graphql(
+        undefined,
+        /* GraphQL */ `
+          query AnonQuarantine {
+            files(where: { bucket_id: { _eq: "garmindb-quarantine" } }) {
+              id
+            }
+          }
+        `,
+      );
+      expect(result.data?.files ?? []).toEqual([]);
+    });
+
+    it("does not let A upload into the quarantine bucket as B", async () => {
+      const result = await graphql(
+        jwtA,
+        /* GraphQL */ `
+          mutation UploadAsB($user_id: uuid!) {
+            insert_files_one(
+              object: {
+                bucket_id: "garmindb-quarantine"
+                name: "garmin.db"
+                size: 1
+                uploaded_by_user_id: $user_id
+              }
+            ) {
+              id
+            }
+          }
+        `,
+        { user_id: "00000000-0000-0000-0000-00000000000b" },
+      );
+      expect(result.errors?.length).toBeGreaterThan(0);
+    });
+
+    it("does not let A forge import provenance", async () => {
+      // source_provenance carries the measurement system and schema version.
+      // A client that could write it could make a bad import look verified.
+      const result = await graphql(
+        jwtA,
+        /* GraphQL */ `
+          mutation ForgeProvenance {
+            update_import_files(
+              where: {}
+              _set: { source_provenance: { measurementSystem: "metric" } }
+            ) {
+              affected_rows
+            }
+          }
+        `,
+      );
+      expect(result.errors?.length).toBeGreaterThan(0);
+    });
+
+    it("does not return B's GarminDB-sourced health rows to A", async () => {
+      const result = await graphql(
+        jwtA,
+        /* GraphQL */ `
+          query GarminDbRows {
+            daily_health_metrics(where: { source: { _eq: "garmindb" } }) {
+              id
+              user_id
+            }
+            body_measurements(where: { source: { _eq: "garmindb" } }) {
+              id
+              user_id
+            }
+          }
+        `,
+      );
+      expect(result.errors).toBeUndefined();
+      const bProfile = await graphql(jwtB, SELECT_PROFILES);
+      const bId = (
+        (bProfile.data?.profiles ?? []) as Array<{ user_id: string }>
+      )[0]?.user_id;
+      if (!bId) {
+        return;
+      }
+      for (const key of ["daily_health_metrics", "body_measurements"]) {
+        const rows = (result.data?.[key] ?? []) as Array<{ user_id: string }>;
+        expect(rows.every((row) => row.user_id !== bId)).toBe(true);
+      }
+    });
+
     it("rejects anonymous reads of import tables", async () => {
       const result = await graphql(
         undefined,

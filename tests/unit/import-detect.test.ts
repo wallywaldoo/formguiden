@@ -28,17 +28,17 @@ describe("import detection and checksums", () => {
     expect(detectFileKind(readFixture("activities.csv"))).toBe("csv");
   });
 
-  it("does not trust a PNG that is named like a FIT file", () => {
+  it("does not trust a PNG that is named like a FIT file", async () => {
     expect(detectFileKind(pngBytes())).toBe("unknown");
-    const parsed = inspectAndParse(pngBytes());
+    const parsed = await inspectAndParse(pngBytes());
     expect(parsed.kind).toBe("unknown");
     expect(parsed.parse.activities).toEqual([]);
   });
 
-  it("rejects a truncated FIT header", () => {
+  it("rejects a truncated FIT header", async () => {
     const kind = detectFileKind(truncatedFitBytes());
     expect(kind).toBe("fit");
-    const parsed = inspectAndParse(truncatedFitBytes());
+    const parsed = await inspectAndParse(truncatedFitBytes());
     expect(parsed.parse.activities).toEqual([]);
     expect(parsed.parse.warnings.length).toBeGreaterThan(0);
   });

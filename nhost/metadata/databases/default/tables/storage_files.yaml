@@ -10,6 +10,7 @@ insert_permissions:
               _in:
                 - garmin-imports
                 - user-exports
+                - garmindb-quarantine
           - uploaded_by_user_id:
               _eq: X-Hasura-User-Id
       set:
@@ -42,6 +43,7 @@ select_permissions:
               _in:
                 - garmin-imports
                 - user-exports
+                - garmindb-quarantine
           - uploaded_by_user_id:
               _eq: X-Hasura-User-Id
       allow_aggregations: false
@@ -62,6 +64,7 @@ update_permissions:
               _in:
                 - garmin-imports
                 - user-exports
+                - garmindb-quarantine
           - uploaded_by_user_id:
               _eq: X-Hasura-User-Id
       check:
@@ -70,6 +73,7 @@ update_permissions:
               _in:
                 - garmin-imports
                 - user-exports
+                - garmindb-quarantine
           - uploaded_by_user_id:
               _eq: X-Hasura-User-Id
       set:
@@ -83,5 +87,6 @@ delete_permissions:
               _in:
                 - garmin-imports
                 - user-exports
+                - garmindb-quarantine
           - uploaded_by_user_id:
               _eq: X-Hasura-User-Id

@@ -18,7 +18,9 @@ const subdomain = process.argv[2] ?? process.env.NHOST_SUBDOMAIN;
 const region = process.argv[3] ?? process.env.NHOST_REGION ?? "eu-central-1";
 
 if (!subdomain) {
-  console.error("Usage: node scripts/apply-cloud-migrations.mjs <subdomain> [region]");
+  console.error(
+    "Usage: node scripts/apply-cloud-migrations.mjs <subdomain> [region]",
+  );
   process.exit(1);
 }
 
@@ -28,7 +30,9 @@ function readSecret(name) {
     .find((row) => row.startsWith(`${name} `));
   const match = line?.match(/'([^']*)'/);
   if (!match?.[1]) {
-    throw new Error(`Missing ${name} in .secrets — run nhost config pull first.`);
+    throw new Error(
+      `Missing ${name} in .secrets — run nhost config pull first.`,
+    );
   }
   return match[1];
 }

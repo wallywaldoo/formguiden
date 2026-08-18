@@ -14,18 +14,19 @@ import {
   GET_IMPORT,
   GET_STORAGE_FILE,
 } from "@/lib/graphql/queries/imports";
+import { GET_PROFILE_SETTINGS } from "@/lib/graphql/queries/profile";
 import { graphqlRequest } from "@/lib/graphql/client";
+import type { ImportProviderId } from "@/lib/import/adapters/types";
 import { sha256Hex } from "@/lib/import/checksum";
+import { scanForCredentialMaterial } from "@/lib/import/credentials/scan";
 import { detectFileKind } from "@/lib/import/detect";
-import {
-  IMPORT_SOURCE,
-  PREVIEW_TTL_DAYS,
-  PROCESS_LEASE_SECONDS,
-} from "@/lib/import/limits";
+import { entriesContainDatabase } from "@/lib/import/garmindb/archive";
+import { GarminDbRejectionError } from "@/lib/import/garmindb/errors";
+import { PREVIEW_TTL_DAYS, PROCESS_LEASE_SECONDS } from "@/lib/import/limits";
 import { inspectAndParse } from "@/lib/import/parse-bytes";
 import type { ParseResult } from "@/lib/import/types";
 import { ZipLimitError, listZipEntries } from "@/lib/import/zip";
-import { GARMIN_IMPORTS_BUCKET } from "@/lib/constants";
+import { DEFAULT_TIMEZONE, GARMIN_IMPORTS_BUCKET } from "@/lib/constants";
 import { createNhostClient } from "@/lib/nhost/server";
 
 export type SliceResult = {
@@ -88,10 +89,22 @@ function expiresAt(): string {
   return date.toISOString();
 }
 
+async function resolveTimeZone(): Promise<string> {
+  try {
+    const profile = await graphqlRequest<{
+      user_preferences: Array<{ timezone: string }>;
+    }>(GET_PROFILE_SETTINGS);
+    return profile.user_preferences[0]?.timezone || DEFAULT_TIMEZONE;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
 async function writePreviews(
   importId: string,
   importFileId: string,
   parsed: ParseResult,
+  source: ImportProviderId,
 ) {
   const expires = expiresAt();
   for (const activity of parsed.activities) {
@@ -102,7 +115,7 @@ async function writePreviews(
         import_id: importId,
         import_file_id: importFileId,
         expires_at: expires,
-        source: IMPORT_SOURCE,
+        source,
         external_id: activity.externalId,
         activity_type: activity.activityType,
         started_at: activity.startedAt,
@@ -144,7 +157,7 @@ async function writePreviews(
         import_id: importId,
         import_file_id: importFileId,
         expires_at: expires,
-        source: IMPORT_SOURCE,
+        source,
         ...{
           external_id: day.externalId,
           local_date: day.localDate,
@@ -172,7 +185,7 @@ async function writePreviews(
         import_id: importId,
         import_file_id: importFileId,
         expires_at: expires,
-        source: IMPORT_SOURCE,
+        source,
         external_id: body.externalId,
         measured_at: body.measuredAt,
         mass_kg: body.massKg,
@@ -190,6 +203,7 @@ async function markFile(
     error_message?: string;
     detected_kind?: string;
     sha256?: string;
+    source_provenance?: Record<string, unknown>;
   },
 ) {
   await graphqlRequest(UPDATE_IMPORT_FILE, {
@@ -200,6 +214,9 @@ async function markFile(
       ...(extra?.error_code ? { error_code: extra.error_code } : {}),
       ...(extra?.error_message ? { error_message: extra.error_message } : {}),
       ...(extra?.sha256 ? { sha256: extra.sha256 } : {}),
+      ...(extra?.source_provenance
+        ? { source_provenance: extra.source_provenance }
+        : {}),
     },
   });
 }
@@ -217,6 +234,7 @@ async function handleParsedBytes(args: {
   fileId: string;
   bytes: Uint8Array;
   detectedKind?: string;
+  timeZone: string;
 }) {
   const hash = sha256Hex(args.bytes);
   if (await isCommittedHash(hash)) {
@@ -226,7 +244,9 @@ async function handleParsedBytes(args: {
     });
     return;
   }
-  const inspected = inspectAndParse(args.bytes);
+  const inspected = await inspectAndParse(args.bytes, {
+    timeZone: args.timeZone,
+  });
   if (
     inspected.parse.activities.length === 0 &&
     inspected.parse.dailyHealth.length === 0 &&
@@ -242,10 +262,16 @@ async function handleParsedBytes(args: {
     });
     return;
   }
-  await writePreviews(args.importId, args.fileId, inspected.parse);
+  await writePreviews(
+    args.importId,
+    args.fileId,
+    inspected.parse,
+    inspected.source,
+  );
   await markFile(args.fileId, "previewed", {
     detected_kind: inspected.kind,
     sha256: hash,
+    source_provenance: inspected.provenance,
   });
 }
 
@@ -336,15 +362,48 @@ export async function processImportSlice(
     return { status: "done", importId, importStatus: status };
   }
 
+  const timeZone = await resolveTimeZone();
+
   try {
     const bytes = await downloadStorageFile(current.storage_file_id, userId);
 
     const kind = detectFileKind(bytes);
     if (kind === "zip") {
       const entries = listZipEntries(bytes);
+
+      // One credential-bearing entry condemns the whole archive. Rejecting
+      // per entry would let a hostile archive import its payload anyway.
+      const finding = entries
+        .map((entry) => scanForCredentialMaterial(entry.bytes))
+        .find((result) => result !== null);
+
       const entryIndex =
         job.cursor.fileId === current.id ? (job.cursor.entryIndex ?? 0) : 0;
-      if (entryIndex >= entries.length) {
+
+      if (finding) {
+        await markFile(current.id, "failed", {
+          detected_kind: "zip",
+          error_code: finding.code,
+          error_message: finding.message,
+        });
+        await graphqlRequest(UPDATE_IMPORT_JOB, {
+          id: job.id,
+          set: { cursor: {}, last_error: finding.message },
+        });
+      } else if (entriesContainDatabase(entries)) {
+        // Parsed as one unit so the tighter GarminDB archive rules apply.
+        await handleParsedBytes({
+          importId,
+          fileId: current.id,
+          bytes,
+          detectedKind: "zip",
+          timeZone,
+        });
+        await graphqlRequest(UPDATE_IMPORT_JOB, {
+          id: job.id,
+          set: { cursor: {} },
+        });
+      } else if (entryIndex >= entries.length) {
         await markFile(
           current.id,
           entries.length === 0 ? "failed" : "previewed",
@@ -379,6 +438,7 @@ export async function processImportSlice(
           importId,
           fileId: child.insert_import_files_one.id,
           bytes: entry.bytes,
+          timeZone,
         });
         await graphqlRequest(UPDATE_IMPORT_JOB, {
           id: job.id,
@@ -392,6 +452,7 @@ export async function processImportSlice(
         fileId: current.id,
         bytes,
         detectedKind: kind,
+        timeZone,
       });
       await graphqlRequest(UPDATE_IMPORT_JOB, {
         id: job.id,
@@ -400,12 +461,15 @@ export async function processImportSlice(
     }
   } catch (error) {
     const message =
-      error instanceof ZipLimitError
+      error instanceof ZipLimitError ||
+      error instanceof GarminDbRejectionError ||
+      error instanceof Error
         ? error.message
-        : error instanceof Error
-          ? error.message
-          : "Kunde inte bearbeta filen.";
-    const code = error instanceof ZipLimitError ? error.code : "process_error";
+        : "Kunde inte bearbeta filen.";
+    const code =
+      error instanceof ZipLimitError || error instanceof GarminDbRejectionError
+        ? error.code
+        : "process_error";
     await markFile(current.id, "failed", {
       error_code: code,
       error_message: message,

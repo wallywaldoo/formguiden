@@ -60,6 +60,7 @@ Starter limits: pause after 7 days of inactivity, **no automated backups**, 1 GB
 | [docs/mvp-scope.md](docs/mvp-scope.md)                             | In-scope / out-of-scope for the MVP                     |
 | [docs/user-flows.md](docs/user-flows.md)                           | End-to-end user flows                                   |
 | [docs/data-import-strategy.md](docs/data-import-strategy.md)       | Garmin file import, limits, and resumable processing    |
+| [docs/garmindb-compatibility.md](docs/garmindb-compatibility.md)   | GarminDB local-export path (implemented)                |
 | [docs/database-schema.md](docs/database-schema.md)                 | PostgreSQL model, constraints, and retention            |
 | [docs/security-model.md](docs/security-model.md)                   | Auth, Hasura, Storage, and authorization tests          |
 | [docs/ai-nutrition-estimation.md](docs/ai-nutrition-estimation.md) | Opt-in calorie estimation design (no paid provider yet) |

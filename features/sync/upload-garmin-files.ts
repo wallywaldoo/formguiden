@@ -3,7 +3,9 @@ import { GARMIN_IMPORTS_BUCKET } from "@/lib/constants";
 import { MAX_UPLOAD_BYTES } from "@/lib/import/limits";
 import { createBrowserNhostClient } from "@/lib/nhost/browser";
 
-const ACCEPT_HINT = /(\.fit|\.tcx|\.gpx|\.csv|\.zip)$/i;
+// .db covers GarminDB's local garmin.db export. The extension is only a hint;
+// the server decides from content.
+const ACCEPT_HINT = /(\.fit|\.tcx|\.gpx|\.csv|\.zip|\.db)$/i;
 
 export async function sha256Hex(file: File): Promise<string> {
   const digest = await crypto.subtle.digest(

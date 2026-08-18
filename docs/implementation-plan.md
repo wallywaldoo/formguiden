@@ -2,9 +2,11 @@
 
 Work in small phases. Do not implement all phases at once. **Stop after each phase until the owner approves the next.**
 
-## Current repository state (17 August 2026)
+## Current repository state (18 August 2026)
 
 Phase 5 coaching and hardening is in the repository: deterministic recommendations, weekly report, data export, account deletion with grace period, and [operations.md](operations.md). Phase 4 logging (nutrition, hydration, strength) and the disabled AI stub remain unchanged. Local `nhost up` and a live Vercel preview still require Docker + Nhost CLI and owner-created cloud projects. Starter still pauses after 7 days and has no automated backups.
+
+Phase 6 (GarminDB compatibility) is **designed and approved** in [garmindb-compatibility.md](garmindb-compatibility.md), but no integration code has been written yet.
 
 ## Phase 0 — Specification (complete)
 
@@ -23,6 +25,13 @@ Phase 5 coaching and hardening is in the repository: deterministic recommendatio
 - `docs/app-architecture.md`
 - `docs/design-system.md`
 - `docs/implementation-plan.md` (this file)
+
+**Amended 18 August 2026** for the GarminDB compatibility path:
+
+- `docs/garmindb-compatibility.md` (new — architecture, import strategy, threat model, licensing, acceptance criteria)
+- `docs/data-import-strategy.md` §11 and the adapter model
+- `docs/security-model.md` §1a, §6.1, §8.1–8.4, §9 threat model, §11 tests 15–21, §12
+- `docs/app-architecture.md` §2, §8.1, §11
 
 **Not done:** Next.js app, Nhost init, Vercel project, secrets.
 
@@ -143,6 +152,85 @@ Nutrition, hydration, manual weight, strength sessions and sets. AI estimator is
 
 Deterministic recommendations (`lib/recommendations`), weekly report (`/report`), bounded data export (`/settings/privacy`), account deletion with 7-day grace and `scripts/purge-deletion-requests.mjs`, [docs/operations.md](operations.md). **No external user launch** until the owner approves the operational plan.
 
+## Phase 6 — GarminDB compatibility (implemented)
+
+### Objective
+
+Let users who already run [GarminDB](https://github.com/tcgoetz/GarminDB) on their own computer upload its `garmin.db` output and get sleep, resting heart rate, HRV, stress, body battery, steps, and weight into Formkurvan's canonical model — without Formkurvan ever touching a Garmin credential.
+
+Full design: [garmindb-compatibility.md](garmindb-compatibility.md).
+
+### Scope
+
+| In                                                        | Out                                                               |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| `garmin.db` only, schema version pinned                   | `garmin_activities.db`, `garmin_monitoring.db`, summary databases |
+| Content-based credential and shape rejection              | Any Garmin login, OAuth, or credential field                      |
+| `sql.js` WASM read-only parsing with hard limits          | Native SQLite addons, Python worker, container, queue             |
+| Quarantine bucket, preview, explicit confirm              | Automatic downloading from Garmin Connect                         |
+| Cross-source duplicate detection against FIT-sourced data | Importing Garmin's derived rollups                                |
+| Activities via existing FIT drag-and-drop                 | Activities from SQLite                                            |
+
+### Decisions (resolved 18 August 2026)
+
+Design approved, including the GPL-2.0 analysis. O-1 through O-5 in [garmindb-compatibility.md](garmindb-compatibility.md) §13 are answered: quarantine buckets approved, `garmin_activities.db` out of scope, GarminDB supported but not evangelised, `sql.js` accepted, unknown units refused rather than guessed.
+
+### Phase 6 acceptance criteria
+
+Functional:
+
+- [x] A valid metric `garmin.db` previews expected daily health and body measurement rows, then commits on confirm.
+- [x] A statute-units database converts to SI correctly (160 lb → 72.57 kg).
+- [x] A database with no `attributes.measurement_system` is **refused**, with no partial import and no guessed units.
+- [x] An unsupported schema version is refused with a clear Swedish message naming the supported version.
+- [x] A ZIP containing exactly one valid `garmin.db` is accepted; a whole `HealthData` directory is rejected with specific guidance.
+- [x] Provenance records schema version, table versions, measurement system, assumed timezone, and row counts.
+- [x] Re-uploading identical bytes is a file-level duplicate no-op (existing `sha256` path).
+- [x] Swedish UI; English code.
+- [ ] The detected measurement system and assumed timezone are shown in the preview before confirm. _Computed and stored; not yet rendered on `/import/[id]`._
+- [ ] Days that overlap existing FIT-sourced data are flagged and deselected by default.
+- [ ] Partial failure in one table commits the rest and marks the import `partial`.
+
+Security (automated):
+
+- [x] `GarminConnectConfig.json` rejected standalone and inside an archive, even when a valid database sits beside it.
+- [x] The same file renamed to an accepted name is still rejected — every probe reads bytes, never filenames.
+- [x] JSON with a `credentials.user` key, JWT-shaped content, and `Bearer` tokens rejected.
+- [x] Garmin identity files (`personal-information.json`, `social-profile.json`) rejected.
+- [x] `garmindb.log`, Python tracebacks, and executables (PE, ELF, Mach-O, WASM, shebang) rejected.
+- [x] Databases containing triggers or virtual tables rejected; an allowlisted name that resolves to a view is not read.
+- [x] Oversized files rejected before reaching the parser; row and time ceilings enforced per table and per import.
+- [x] Rejection messages carry a category code only — no credential value, key path, or file content.
+- [x] Only allowlisted columns are read, verified against a database that also contains non-allowlisted ones.
+- [x] `source_provenance` is server-written only; the metadata contract test proves a client cannot forge it.
+- [ ] Tests 30–40 of [garmindb-compatibility.md](garmindb-compatibility.md) §10.4: written in `tests/authorization/live-graphql.test.ts`, but they skip until `NHOST_TEST_*` credentials are supplied.
+- [ ] Symlink and `../` traversal rejection is implemented in `archive.ts` but not yet covered by a fixture test.
+- [ ] Account deletion removes quarantine objects.
+
+Engineering and licensing:
+
+- [x] No GarminDB source code, vendored, adapted, or translated, anywhere in the tree.
+- [x] `garmindb` is not a dependency in `package.json`, any image, script, or CI job.
+- [x] `sql.js` pinned by exact version; WASM asset read from our own `node_modules`, never a CDN.
+- [x] No Garmin network call is added; no Python worker, container, queue, or paid hosting.
+- [x] Format, lint, `tsc --noEmit`, unit, authorization, and import-fixture suites pass; `next build` succeeds.
+- [ ] Quarantine objects are deleted on rejection and on confirm; the 24 h sweep is tested.
+
+### Remaining before Phase 6 can be called done
+
+The parsing, rejection, and mapping layers are complete and tested. What is left is
+flow work, not analysis:
+
+1. **Quarantine graduation.** The bucket, its permissions, and its isolation tests exist, but uploads still land directly in `garmin-imports`. Route GarminDB uploads to `garmindb-quarantine`, move them across on confirm, and delete on rejection.
+2. **Quarantine sweep.** A 24 h cleanup job plus account-deletion coverage for the new bucket.
+3. **Preview disclosure.** Render the measurement system and assumed timezone on `/import/[id]`, so a wrong unit system is caught before commit rather than after.
+4. **Cross-source overlap.** Flag days that already have FIT-sourced data and deselect them by default.
+5. **Live authorization run.** Supply `NHOST_TEST_*` credentials and execute tests 30–40 against a real project.
+
+### Phase 6 non-goals
+
+Activity import from SQLite, monitoring tables, summary tables, automatic sync, FitBit/MS Health data, and any change to the official Garmin API stub.
+
 ---
 
 ## Expected upgrade point (cost)
@@ -183,6 +271,16 @@ See [product-spec.md](product-spec.md) §8. Owner should confirm especially:
 
 ## Exactly one next phase
 
-**Phase 5 — Coaching and hardening:** deterministic recommendations, weekly report, export, account deletion, manual backup/restore drill, monitoring notes. No external user launch until the owner approves the operational plan.
+**Phase 6 — GarminDB compatibility.** Design approved 18 August 2026. Implementation may start.
 
-Wait for explicit approval before starting Phase 5.
+Suggested order, smallest verifiable slice first:
+
+1. `lib/import/credentials/scan.ts` plus its negative tests. Nothing else lands until rejection works.
+2. `lib/import/garmindb/fingerprint.ts` and `open.ts` — SQLite detection, version pin, sandbox limits.
+3. `queries.ts`, `units.ts`, `map.ts` — frozen SELECTs and canonical mapping, with the statute-conversion tests.
+4. `adapters/garmindb.ts` wired into the existing preview and confirm pipeline.
+5. Migrations and metadata: `garmindb-quarantine` bucket, `garmindb` source value, provenance columns.
+6. UI: upload entry point, preview with measurement system and timezone disclosure, rejection states.
+7. Cross-tenant authorization tests (§10.4 tests 30–40) before the phase closes.
+
+Steps 1 and 7 are non-negotiable gates. Do not ship the adapter with the credential scan or the isolation tests outstanding.

@@ -81,9 +81,9 @@ describe("import parsers", () => {
     ).toThrow(NotEligibleError);
   });
 
-  it("inspects bytes without trusting ZIP contents as a single activity", () => {
+  it("inspects bytes without trusting ZIP contents as a single activity", async () => {
     const zipHeader = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]);
-    const inspected = inspectAndParse(zipHeader);
+    const inspected = await inspectAndParse(zipHeader);
     expect(inspected.kind).toBe("zip");
     expect(inspected.parse.activities).toEqual([]);
   });

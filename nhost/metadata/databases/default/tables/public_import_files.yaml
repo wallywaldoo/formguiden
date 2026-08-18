@@ -40,6 +40,7 @@ select_permissions:
         - zip_entry_path
         - error_code
         - error_message
+        - source_provenance
         - created_at
         - updated_at
       filter:

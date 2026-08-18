@@ -31,6 +31,11 @@ export const PKCE_VERIFIER_COOKIE = "nhost_pkce_verifier";
 
 export const GARMIN_IMPORTS_BUCKET = "garmin-imports";
 export const USER_EXPORTS_BUCKET = "user-exports";
+/**
+ * Uploads land here before validation and graduate to garmin-imports only
+ * after passing every check. Objects that never graduate are deleted.
+ */
+export const GARMINDB_QUARANTINE_BUCKET = "garmindb-quarantine";
 
 export const ACCOUNT_DELETION_GRACE_DAYS = 7;
 export const RECOMMENDATION_VALID_HOURS = 24;

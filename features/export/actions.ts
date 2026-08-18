@@ -44,9 +44,7 @@ export async function requestExportAction(): Promise<ExportActionResult> {
   } catch (error) {
     return {
       error:
-        error instanceof Error
-          ? error.message
-          : "Kunde inte starta exporten.",
+        error instanceof Error ? error.message : "Kunde inte starta exporten.",
     };
   }
 }
@@ -73,8 +71,7 @@ export async function processExportAction(
   } catch (error) {
     return {
       jobId,
-      error:
-        error instanceof Error ? error.message : "Exporten misslyckades.",
+      error: error instanceof Error ? error.message : "Exporten misslyckades.",
     };
   }
 }

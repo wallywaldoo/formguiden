@@ -4,6 +4,7 @@ export const FILE_KINDS = [
   "gpx",
   "csv",
   "zip",
+  "sqlite",
   "unknown",
 ] as const;
 
@@ -13,6 +14,7 @@ const FIT_MARKER = new TextEncoder().encode(".FIT");
 const ZIP_LOCAL = [0x50, 0x4b, 0x03, 0x04];
 const ZIP_EMPTY = [0x50, 0x4b, 0x05, 0x06];
 const PNG = [0x89, 0x50, 0x4e, 0x47];
+const SQLITE = [...new TextEncoder().encode("SQLite format 3"), 0x00];
 
 function startsWith(bytes: Uint8Array, signature: number[]): boolean {
   if (bytes.length < signature.length) {
@@ -34,6 +36,9 @@ export function detectFileKind(bytes: Uint8Array): FileKind {
   }
   if (startsWith(bytes, ZIP_LOCAL) || startsWith(bytes, ZIP_EMPTY)) {
     return "zip";
+  }
+  if (startsWith(bytes, SQLITE)) {
+    return "sqlite";
   }
   if (startsWith(bytes, PNG)) {
     return "unknown";

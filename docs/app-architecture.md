@@ -71,6 +71,8 @@ lib/
     gpx/
     csv/
     zip/
+    garmindb/         # GarminDB garmin.db adapter
+    credentials/      # content-based credential rejection
   analytics/
   ai/
   validation/
@@ -167,6 +169,24 @@ See [data-import-strategy.md](data-import-strategy.md).
 
 Nhost Functions stay unused for parsing on Starter (10 s, 6 MB, no native addons).
 
+### 8.1 GarminDB compatibility (Phase 6)
+
+Design: [garmindb-compatibility.md](garmindb-compatibility.md). No code until the owner approves.
+
+GarminDB runs on the user's computer and is outside the trust boundary. Formkurvan reads one of its output files and nothing else.
+
+| Job                        | Where                                                                |
+| -------------------------- | -------------------------------------------------------------------- |
+| Run GarminDB               | **User's own machine.** Never our infrastructure                     |
+| Upload `garmin.db`         | Browser → `garmindb-quarantine` (user JWT)                           |
+| Credential + shape scan    | Server, before parsing and before durable persistence                |
+| Parse SQLite               | `lib/import/garmindb` via `sql.js` (WASM), read-only, bounded        |
+| Promote to durable storage | Server, on user confirm: copy to `garmin-imports`, delete quarantine |
+
+The "no native addons" constraint that rules out Nhost Functions also rules out `better-sqlite3`. WASM keeps the parser portable and memory-isolated.
+
+Explicitly not added: Python worker, container service, queue, paid hosting, GarminDB as a dependency, or any Garmin network call.
+
 ## 9. Analytics engine
 
 `lib/analytics` implements documented formulas with:
@@ -215,21 +235,24 @@ Playwright is optional for Phase 5 smoke tests; not required in Phase 1.
 
 Only install when a phase needs them. Each must be justified:
 
-| Package                                                                | Phase | Why                                                          |
-| ---------------------------------------------------------------------- | ----- | ------------------------------------------------------------ |
-| `@nhost/nhost-js`                                                      | 1     | Official Auth/GraphQL/Storage SDK                            |
-| `zod`                                                                  | 1     | Required validation                                          |
-| `class-variance-authority`, `clsx`, `tailwind-merge`                   | 1     | Required by shadcn.io `cn` helper                            |
-| `lucide-react`                                                         | 1     | Icons used by shadcn.io primitives                           |
-| `radix-ui` (or per-component radix packages as the registry specifies) | 1     | shadcn.io primitive behaviour/a11y                           |
-| `react-hook-form`, `@hookform/resolvers`                               | 1     | shadcn.io Form                                               |
-| `sonner`                                                               | 1     | shadcn.io toasts                                             |
-| `next-themes`                                                          | 1     | Only if the installed shadcn preset requires it; skip if not |
-| `@garmin/fitsdk`                                                       | 2     | FIT parse, no native addon                                   |
-| `fflate`                                                               | 2     | ZIP inflate in pure JS                                       |
-| `@xmldom/xmldom`                                                       | 2     | TCX/GPX XML without browser `DOMParser` in Node              |
-| `recharts`                                                             | 3     | shadcn.io Chart                                              |
-| AI vendor SDK                                                          | 4     | Only after approval                                          |
+| Package                                                                | Phase | Why                                                                 |
+| ---------------------------------------------------------------------- | ----- | ------------------------------------------------------------------- |
+| `@nhost/nhost-js`                                                      | 1     | Official Auth/GraphQL/Storage SDK                                   |
+| `zod`                                                                  | 1     | Required validation                                                 |
+| `class-variance-authority`, `clsx`, `tailwind-merge`                   | 1     | Required by shadcn.io `cn` helper                                   |
+| `lucide-react`                                                         | 1     | Icons used by shadcn.io primitives                                  |
+| `radix-ui` (or per-component radix packages as the registry specifies) | 1     | shadcn.io primitive behaviour/a11y                                  |
+| `react-hook-form`, `@hookform/resolvers`                               | 1     | shadcn.io Form                                                      |
+| `sonner`                                                               | 1     | shadcn.io toasts                                                    |
+| `next-themes`                                                          | 1     | Only if the installed shadcn preset requires it; skip if not        |
+| `@garmin/fitsdk`                                                       | 2     | FIT parse, no native addon                                          |
+| `fflate`                                                               | 2     | ZIP inflate in pure JS                                              |
+| `@xmldom/xmldom`                                                       | 2     | TCX/GPX XML without browser `DOMParser` in Node                     |
+| `recharts`                                                             | 3     | shadcn.io Chart                                                     |
+| AI vendor SDK                                                          | 4     | Only after approval                                                 |
+| `sql.js`                                                               | 6     | Read untrusted SQLite in WASM; no native addon. Only after approval |
+
+`garmindb` itself is **never** a dependency — not in `package.json`, a container image, a script, or CI. See [garmindb-compatibility.md](garmindb-compatibility.md) §9 for the GPL-2.0 reasoning.
 
 Pin versions and commit the lockfile (`package-lock.json` or `pnpm-lock.yaml`). Default package manager: **npm** to match Nhost tutorials unless the owner prefers pnpm.
 
