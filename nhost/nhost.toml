@@ -39,7 +39,12 @@ version = '0.49.1'
 mode = 'disabled'
 
 [auth.redirections]
-clientUrl = 'http://localhost:3000'
+clientUrl = 'https://formguiden.vercel.app'
+allowedUrls = [
+  'http://localhost:3000',
+  'https://formguiden.vercel.app',
+  'https://*.vercel.app',
+]
 
 [auth.signUp]
 enabled = true
