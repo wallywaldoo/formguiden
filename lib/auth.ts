@@ -1,21 +1,37 @@
+import { timingSafeEqual } from "node:crypto";
+
+import { compareSync } from "bcryptjs";
 import { cookies } from "next/headers";
 
 const SESSION_COOKIE_NAME = "fk_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
+const BCRYPT_PREFIX = /^\$2[aby]\$/;
+
+export function hasConfiguredPassword(): boolean {
+  return Boolean(process.env.AUTH_PASSWORD);
+}
+
+function verifyPlaintextPassword(expected: string, password: string): boolean {
+  const expectedBytes = Buffer.from(expected);
+  const passwordBytes = Buffer.from(password);
+  if (expectedBytes.length !== passwordBytes.length) return false;
+  return timingSafeEqual(expectedBytes, passwordBytes);
+}
+
 /**
  * Verify a password against the AUTH_PASSWORD env var.
- * For a single-user app, a simple constant-time string comparison suffices.
+ * Supports either a plaintext secret or a bcrypt hash.
  */
 export function verifyPassword(password: string): boolean {
   const expected = process.env.AUTH_PASSWORD;
   if (!expected || !password) return false;
-  if (expected.length !== password.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < expected.length; i++) {
-    mismatch |= expected.charCodeAt(i) ^ password.charCodeAt(i);
+
+  if (BCRYPT_PREFIX.test(expected)) {
+    return compareSync(password, expected);
   }
-  return mismatch === 0;
+
+  return verifyPlaintextPassword(expected, password);
 }
 
 function generateSessionToken(): string {

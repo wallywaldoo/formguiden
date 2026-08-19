@@ -2,7 +2,12 @@
 
 import { redirect } from "next/navigation";
 
-import { createSession, destroySession, verifyPassword } from "@/lib/auth";
+import {
+  createSession,
+  destroySession,
+  hasConfiguredPassword,
+  verifyPassword,
+} from "@/lib/auth";
 
 export type ActionResult = {
   error?: string;
@@ -13,6 +18,10 @@ export async function signInAction(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  if (!hasConfiguredPassword()) {
+    return { error: "AUTH_PASSWORD saknas i servermiljonen." };
+  }
+
   const password = formData.get("password");
   if (typeof password !== "string" || !password) {
     return { error: "Ange ditt lösenord." };
