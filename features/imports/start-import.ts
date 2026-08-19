@@ -80,7 +80,7 @@ export async function startImportFromUploadedFiles(
 
     for (const file of parsed.data) {
       const meta = await graphqlRequest<{
-        files_by_pk: {
+        storage_files_by_pk: {
           id: string;
           bucket_id: string;
           uploaded_by_user_id: string | null;
@@ -89,7 +89,7 @@ export async function startImportFromUploadedFiles(
           mime_type: string | null;
         } | null;
       }>(GET_STORAGE_FILE, { id: file.id });
-      const stored = meta.files_by_pk;
+      const stored = meta.storage_files_by_pk;
       if (
         !stored ||
         stored.bucket_id !== GARMIN_IMPORTS_BUCKET ||

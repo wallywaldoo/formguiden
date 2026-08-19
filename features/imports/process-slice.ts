@@ -64,7 +64,7 @@ async function downloadStorageFile(
   userId: string,
 ): Promise<Uint8Array> {
   const meta = await graphqlRequest<{
-    files_by_pk: {
+    storage_files_by_pk: {
       id: string;
       bucket_id: string;
       uploaded_by_user_id: string | null;
@@ -72,7 +72,7 @@ async function downloadStorageFile(
     } | null;
   }>(GET_STORAGE_FILE, { id: fileId });
 
-  const file = meta.files_by_pk;
+  const file = meta.storage_files_by_pk;
   if (
     !file ||
     file.bucket_id !== GARMIN_IMPORTS_BUCKET ||

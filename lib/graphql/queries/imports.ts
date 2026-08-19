@@ -1,6 +1,6 @@
 export const GET_STORAGE_FILE = /* GraphQL */ `
   query GetStorageFile($id: uuid!) {
-    files_by_pk(id: $id) {
+    storage_files_by_pk(id: $id) {
       id
       bucket_id
       name
