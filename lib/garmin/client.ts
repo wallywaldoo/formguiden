@@ -150,6 +150,7 @@ function utcFromGmt(value: unknown): string | null {
 
 export class GarminClient {
   private session: GarminSession;
+  private displayName: string | null = null;
   /** Set to the refreshed session after the first call if a refresh happened */
   public refreshedSession: GarminSession | null = null;
 
@@ -196,13 +197,49 @@ export class GarminClient {
         `Garmin API ${path} failed (${res.status}): ${text.slice(0, 300)}`,
       );
     }
-    return res.json() as Promise<T>;
+
+    if (res.status === 204) {
+      return null as T;
+    }
+
+    const text = await res.text();
+    if (!text.trim() || text.trim() === "null") {
+      return null as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch (error) {
+      throw new Error(
+        `Garmin API ${path} returned invalid JSON: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async getDisplayName(): Promise<string> {
+    if (this.displayName) return this.displayName;
+
+    const profile = await this.fetch<{ displayName?: unknown }>(
+      "/userprofile-service/socialProfile",
+    );
+    const displayName =
+      typeof profile?.displayName === "string" ? profile.displayName.trim() : "";
+
+    if (!displayName) {
+      throw new Error("Garmin social profile did not include a displayName");
+    }
+
+    this.displayName = encodeURIComponent(displayName);
+    return this.displayName;
   }
 
   async getDailyStats(date: string): Promise<DailyStats> {
+    const displayName = await this.getDisplayName();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await this.fetch<any>(
-      `/usersummary-service/usersummary/daily/${date}?calendarDate=${date}`,
+      `/usersummary-service/usersummary/daily/${displayName}?calendarDate=${date}`,
     );
     return {
       localDate: date,
@@ -216,9 +253,10 @@ export class GarminClient {
   }
 
   async getSleepData(date: string): Promise<SleepData> {
+    const displayName = await this.getDisplayName();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await this.fetch<any>(
-      `/wellness-service/wellness/dailySleepData/user?date=${date}&nonSleepBufferMinutes=60`,
+      `/wellness-service/wellness/dailySleepData/${displayName}?date=${date}&nonSleepBufferMinutes=60`,
     );
     const dto = data?.dailySleepDTO ?? {};
     return {
@@ -250,7 +288,7 @@ export class GarminClient {
   ): Promise<WeightEntry[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await this.fetch<any>(
-      `/weight-service/weight/dateRange?startDate=${startDate}&endDate=${endDate}`,
+      `/weight-service/weight/range/${startDate}/${endDate}?includeAll=true`,
     );
     const entries: WeightEntry[] = [];
     for (const day of data?.dailyWeightSummaries ?? []) {
