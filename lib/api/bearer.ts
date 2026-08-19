@@ -1,5 +1,5 @@
 import { createServerClient } from "@nhost/nhost-js";
-import { MemoryStorage } from "@nhost/nhost-js/session";
+import { MemoryStorage, type StoredSession } from "@nhost/nhost-js/session";
 import { NextResponse } from "next/server";
 
 import { getNhostConnection } from "@/lib/nhost/config";
@@ -16,6 +16,9 @@ const BEARER_PREFIX = /^Bearer\s+(.+)$/i;
  * spending a network round trip keeps scanners cheap to reject.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** JWT tokens start with eyJ (base64url of {"alg": or {"typ":) */
+const JWT_PREFIX = /^eyJ/;
 
 function unauthorized(): NextResponse {
   return NextResponse.json(
@@ -43,7 +46,7 @@ export async function withBearerAuth(
   const match = header ? BEARER_PREFIX.exec(header) : null;
   const token = match?.[1]?.trim();
 
-  if (!token || !UUID.test(token)) {
+  if (!token) {
     return unauthorized();
   }
 
@@ -54,6 +57,53 @@ export async function withBearerAuth(
     subdomain: connection.subdomain,
     storage,
   });
+
+  if (JWT_PREFIX.test(token)) {
+    // Caller already has a JWT — skip the PAT exchange round-trip.
+    // Decode the user ID from the payload without re-verifying; Hasura will
+    // reject the token on any downstream GraphQL call if it is invalid.
+    try {
+      const payloadB64 = token.split(".")[1];
+      if (!payloadB64) return unauthorized();
+      const payload = JSON.parse(
+        Buffer.from(payloadB64, "base64url").toString("utf8"),
+      ) as Record<string, unknown>;
+      const userId =
+        typeof payload.sub === "string" ? payload.sub : undefined;
+      if (!userId) return unauthorized();
+
+      // Construct a minimal StoredSession so runWithSession/createNhostClient
+      // can inject the JWT into downstream requests.
+      const session = {
+        accessToken: token,
+        accessTokenExpiresIn: 900,
+        refreshToken: "",
+        refreshTokenId: "",
+        user: {
+          id: userId,
+          email: "",
+          displayName: "",
+          avatarUrl: "",
+          locale: "sv",
+          createdAt: "",
+          isAnonymous: false,
+          defaultRole: "user",
+          roles: ["user"],
+          emailVerified: false,
+          phoneNumberVerified: false,
+          activeMfaType: null,
+          metadata: null,
+        },
+      } as unknown as StoredSession;
+      return runWithSession(session, () => handler({ userId }));
+    } catch {
+      return unauthorized();
+    }
+  }
+
+  if (!UUID.test(token)) {
+    return unauthorized();
+  }
 
   try {
     await nhost.auth.signInPAT({ personalAccessToken: token });

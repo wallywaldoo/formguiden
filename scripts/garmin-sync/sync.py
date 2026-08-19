@@ -104,13 +104,29 @@ def upload_via_ingest(
     return result
 
 
-def ingest(app_url: str, pat: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+def exchange_pat_for_jwt(subdomain: str, region: str, pat: str) -> str:
+    """Exchange a Nhost PAT for a short-lived JWT once per session."""
+    import requests
+
+    response = requests.post(
+        f"https://{subdomain}.auth.{region}.nhost.run/v1/signin/pat",
+        json={"personalAccessToken": pat},
+        timeout=30,
+    )
+    response.raise_for_status()
+    jwt = response.json().get("session", {}).get("accessToken")
+    if not jwt:
+        raise RuntimeError("Nhost svarade utan access token.")
+    return jwt
+
+
+def ingest(app_url: str, token: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     import requests
 
     response = requests.post(
         f"{app_url.rstrip('/')}{path}",
         headers={
-            "Authorization": f"Bearer {pat}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
         json=payload or {},
@@ -122,8 +138,17 @@ def ingest(app_url: str, pat: str, path: str, payload: dict[str, Any] | None = N
 
 
 def drive_import(app_url: str, pat: str, import_id: str) -> dict[str, Any]:
+    retries = 0
     while True:
-        result = ingest(app_url, pat, f"/api/ingest/imports/{import_id}/process")
+        try:
+            result = ingest(app_url, pat, f"/api/ingest/imports/{import_id}/process")
+        except RuntimeError as err:
+            if "401" in str(err) and retries < 3:
+                retries += 1
+                time.sleep(2 ** retries)
+                continue
+            raise
+        retries = 0
         if result.get("status") in {"done", "error"}:
             break
         time.sleep(0.4)
@@ -217,44 +242,20 @@ def collect_fits(client: Any, start: date, end: date, seen: set[str]) -> list[tu
     return files
 
 
-def main() -> int:
-    load_env()
-    parser = argparse.ArgumentParser(description="Sync Garmin Connect to Formkurvan")
-    parser.add_argument("--days", type=int, default=14)
-    args = parser.parse_args()
-    if args.days < 1 or args.days > 400:
-        print(" --days måste vara 1–400", file=sys.stderr)
-        return 4
+CHUNK_DAYS = 30  # max days per health-data batch to avoid server timeouts
 
-    app_url = require_env("FORMKURVAN_APP_URL")
-    pat = require_env("FORMKURVAN_PAT")
 
-    if not TOKEN_DIR.exists():
-        print(
-            "Ingen Garmin-token. Kör först: ~/.local/bin/garmin-mcp-auth",
-            file=sys.stderr,
-        )
-        return 1
-
-    from garminconnect import Garmin
-    from importlib.metadata import version as pkg_version
-
-    client = Garmin()
-    client.login(str(TOKEN_DIR))
-    engine_version = pkg_version("garminconnect")
-    provenance = {
-        "engine": "python-garminconnect",
-        "engineVersion": engine_version,
-        "scriptVersion": SCRIPT_VERSION,
-    }
-
-    end = date.today()
-    start = end - timedelta(days=args.days - 1)
-    cursor = load_cursor()
-    seen = {str(item) for item in cursor.get("activityIds", [])}
-
-    print(f"Hämtar {start}–{end} från Garmin Connect…")
-    health = collect_health(client, start, end)
+def sync_health_chunk(
+    app_url: str,
+    pat: str,
+    jwt: str,
+    provenance: dict[str, Any],
+    client: Any,
+    chunk_start: date,
+    chunk_end: date,
+) -> str:
+    """Sync one chunk of health data. Returns result reason string."""
+    health = collect_health(client, chunk_start, chunk_end)
     payload = {
         "schemaVersion": 1,
         "provenance": provenance,
@@ -262,17 +263,14 @@ def main() -> int:
         "bodyMeasurements": health["bodyMeasurements"],
     }
     health_bytes = json.dumps(payload).encode("utf-8")
-
+    # Upload uses PAT so server can derive userId; ingest uses JWT to avoid
+    # repeated PAT-exchange round-trips.
     health_file = upload_via_ingest(
-        app_url,
-        pat,
-        "garmin-connect-health.json",
-        health_bytes,
-        "application/json",
+        app_url, pat, "garmin-connect-health.json", health_bytes, "application/json"
     )
     started = ingest(
         app_url,
-        pat,
+        jwt,
         "/api/ingest/imports",
         {
             "provider": "garmin-connect",
@@ -288,11 +286,64 @@ def main() -> int:
             ],
         },
     )
-    health_result = drive_import(app_url, pat, started["importId"])
-    print(
-        f"Hälsodata: {health_result.get('reason')} "
-        f"(status {health_result.get('importStatus')})"
-    )
+    result = drive_import(app_url, jwt, started["importId"])
+    return f"{result.get('reason')} (status {result.get('importStatus')})"
+
+
+def main() -> int:
+    load_env()
+    parser = argparse.ArgumentParser(description="Sync Garmin Connect to Formkurvan")
+    parser.add_argument("--days", type=int, default=14)
+    args = parser.parse_args()
+    if args.days < 1 or args.days > 400:
+        print(" --days måste vara 1–400", file=sys.stderr)
+        return 4
+
+    app_url = require_env("FORMKURVAN_APP_URL")
+    pat = require_env("FORMKURVAN_PAT")
+    nhost_subdomain = require_env("NHOST_SUBDOMAIN")
+    nhost_region = require_env("NHOST_REGION")
+
+    if not TOKEN_DIR.exists():
+        print(
+            "Ingen Garmin-token. Kör först: ~/.local/bin/garmin-mcp-auth",
+            file=sys.stderr,
+        )
+        return 1
+
+    from garminconnect import Garmin
+    from importlib.metadata import version as pkg_version
+
+    client = Garmin()
+    client.login(str(TOKEN_DIR))
+
+    # Exchange PAT for JWT once; reuse it for all ingest API calls to avoid
+    # repeated Nhost auth round-trips that can be throttled under load.
+    jwt = exchange_pat_for_jwt(nhost_subdomain, nhost_region, pat)
+
+    engine_version = pkg_version("garminconnect")
+    provenance = {
+        "engine": "python-garminconnect",
+        "engineVersion": engine_version,
+        "scriptVersion": SCRIPT_VERSION,
+    }
+
+    end = date.today()
+    start = end - timedelta(days=args.days - 1)
+    cursor = load_cursor()
+    seen = {str(item) for item in cursor.get("activityIds", [])}
+
+    # Split into CHUNK_DAYS blocks so each upload stays within server timeouts.
+    chunk_end = end
+    while chunk_end >= start:
+        chunk_start = max(start, chunk_end - timedelta(days=CHUNK_DAYS - 1))
+        print(f"Hälsodata {chunk_start}–{chunk_end}…")
+        try:
+            result = sync_health_chunk(app_url, pat, jwt, provenance, client, chunk_start, chunk_end)
+            print(f"  → {result}")
+        except Exception as err:
+            print(f"  Fel: {err}", file=sys.stderr)
+        chunk_end = chunk_start - timedelta(days=1)
 
     fits = collect_fits(client, start, end, seen)
     if fits:
@@ -312,7 +363,7 @@ def main() -> int:
             )
         started_fit = ingest(
             app_url,
-            pat,
+            jwt,
             "/api/ingest/imports",
             {
                 "provider": "garmin-file",
@@ -320,7 +371,7 @@ def main() -> int:
                 "files": uploaded,
             },
         )
-        fit_result = drive_import(app_url, pat, started_fit["importId"])
+        fit_result = drive_import(app_url, jwt, started_fit["importId"])
         print(
             f"Pass: {len(fits)} filer · {fit_result.get('reason')} "
             f"(status {fit_result.get('importStatus')})"
@@ -332,11 +383,10 @@ def main() -> int:
     cursor["lastHealthDate"] = end.isoformat()
     save_cursor(cursor)
 
-    if health_result.get("reason") in {"first_run", "provenance_mismatch"}:
-        print(
-            "Bekräfta första importen i Formkurvan under Efter passet. "
-            "Nästa körning med samma skriptversion auto-committar."
-        )
+    print(
+        "\nKlar. Gå till Formkurvan → Efter passet för att bekräfta importerna."
+        "\nNästa körning med samma skriptversion auto-committar."
+    )
     return 0
 
 
