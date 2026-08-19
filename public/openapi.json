@@ -1,0 +1,304 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Formkurvan Assistant API",
+    "description": "REST API för ChatGPT Custom GPT att hämta tränings- och hälsodata från Formkurvan.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://formguiden.vercel.app"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/assistant/profile": {
+      "get": {
+        "operationId": "getProfile",
+        "summary": "Hämta användarprofil",
+        "description": "Returnerar Viktors profil: namn, mål och träningsfokus.",
+        "responses": {
+          "200": {
+            "description": "Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/assistant/activities": {
+      "get": {
+        "operationId": "getActivities",
+        "summary": "Hämta senaste aktiviteter",
+        "description": "Returnerar en lista med senaste träningsaktiviteter.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Antal aktiviteter att returnera (max 50, standard 10).",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Hoppa över detta antal aktiviteter.",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aktivitetslista",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivitiesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/assistant/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Hämta hälsomätvärden",
+        "description": "Returnerar dagliga hälsomätvärden för de senaste N dagarna.",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "description": "Antal dagar att returnera (max 30, standard 7).",
+            "schema": {
+              "type": "integer",
+              "default": 7,
+              "minimum": 1,
+              "maximum": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hälsodata per dag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/assistant/summary": {
+      "get": {
+        "operationId": "getSummary",
+        "summary": "Hämta träningssammanfattning",
+        "description": "Returnerar en komplett sammanfattning med aktiviteter, hälsotrend, mål och coachingkontext. Använd detta som primär datakälla.",
+        "responses": {
+          "200": {
+            "description": "Sammanfattning",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/assistant/ask": {
+      "post": {
+        "operationId": "askQuestion",
+        "summary": "Ställ en fråga med kontext",
+        "description": "Skicka en fråga och få tillbaka relevant träningsdata som kontext för svaret.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fråga med kontext",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ogiltig begäran"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Ogiltig eller saknad API-nyckel",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Goal": {
+        "type": "object",
+        "properties": {
+          "raceType": { "type": "string" },
+          "raceDate": { "type": "string", "format": "date" },
+          "targetPace": { "type": "string" }
+        }
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "currentGoal": { "$ref": "#/components/schemas/Goal" },
+          "weeklyRunDistanceM": { "type": "number" }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "sport": { "type": "string" },
+          "durationS": { "type": "number" },
+          "distanceM": { "type": "number" },
+          "avgHeartRateBpm": { "type": "number" },
+          "elevationGainM": { "type": "number" },
+          "title": { "type": "string" }
+        }
+      },
+      "ActivitiesResponse": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Activity" }
+          },
+          "total": { "type": "integer" }
+        }
+      },
+      "HealthDay": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "restingHeartRateBpm": { "type": "number" },
+          "hrvRmssdMs": { "type": "number" },
+          "sleepDurationS": { "type": "number" },
+          "sleepScore": { "type": "number" },
+          "stressAvg": { "type": "number" },
+          "bodyBatteryHigh": { "type": "number" },
+          "steps": { "type": "number" }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/HealthDay" }
+          }
+        }
+      },
+      "HealthTrend": {
+        "type": "object",
+        "properties": {
+          "avgHrvLast7Days": { "type": "number" },
+          "avgRestingHrLast7Days": { "type": "number" },
+          "avgSleepHoursLast7Days": { "type": "number" },
+          "trainingLoad": { "type": "string" }
+        }
+      },
+      "SummaryResponse": {
+        "type": "object",
+        "properties": {
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "recentActivities": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Activity" }
+          },
+          "healthTrend": { "$ref": "#/components/schemas/HealthTrend" },
+          "currentGoal": { "$ref": "#/components/schemas/Goal" },
+          "coachingContext": { "type": "string" }
+        }
+      },
+      "AskRequest": {
+        "type": "object",
+        "required": ["question"],
+        "properties": {
+          "question": { "type": "string" }
+        }
+      },
+      "AskResponse": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "context": { "type": "object" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}
