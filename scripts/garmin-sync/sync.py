@@ -78,29 +78,10 @@ def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def nhost_base(kind: str, subdomain: str, region: str) -> str:
-    return f"https://{subdomain}.{kind}.{region}.nhost.run/v1"
 
-
-def sign_in_pat(subdomain: str, region: str, pat: str) -> str:
-    import requests
-
-    response = requests.post(
-        f"{nhost_base('auth', subdomain, region)}/signin/pat",
-        json={"personalAccessToken": pat},
-        timeout=30,
-    )
-    response.raise_for_status()
-    token = response.json().get("session", {}).get("accessToken")
-    if not token:
-        raise RuntimeError("Nhost svarade utan access token.")
-    return token
-
-
-def upload_storage(
-    subdomain: str,
-    region: str,
-    jwt: str,
+def upload_via_ingest(
+    app_url: str,
+    pat: str,
     filename: str,
     data: bytes,
     mime: str,
@@ -108,18 +89,19 @@ def upload_storage(
     import requests
 
     response = requests.post(
-        f"{nhost_base('storage', subdomain, region)}/files",
-        headers={"Authorization": f"Bearer {jwt}"},
-        data={"bucket-id": "garmin-imports"},
-        files={"file[]": (filename, data, mime)},
+        f"{app_url.rstrip('/')}/api/ingest/upload",
+        headers={"Authorization": f"Bearer {pat}"},
+        files={"file": (filename, data, mime)},
         timeout=60,
     )
-    response.raise_for_status()
-    processed = response.json().get("processedFiles") or []
-    stored = processed[0] if processed else None
-    if not stored or not stored.get("id"):
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Upload {filename} misslyckades: {response.status_code} {response.text[:300]}"
+        )
+    result = response.json()
+    if not result.get("id"):
         raise RuntimeError(f"Kunde inte ladda upp {filename}.")
-    return stored
+    return result
 
 
 def ingest(app_url: str, pat: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -246,8 +228,6 @@ def main() -> int:
 
     app_url = require_env("FORMKURVAN_APP_URL")
     pat = require_env("FORMKURVAN_PAT")
-    subdomain = require_env("NHOST_SUBDOMAIN")
-    region = require_env("NHOST_REGION")
 
     if not TOKEN_DIR.exists():
         print(
@@ -282,12 +262,10 @@ def main() -> int:
         "bodyMeasurements": health["bodyMeasurements"],
     }
     health_bytes = json.dumps(payload).encode("utf-8")
-    jwt = sign_in_pat(subdomain, region, pat)
 
-    health_file = upload_storage(
-        subdomain,
-        region,
-        jwt,
+    health_file = upload_via_ingest(
+        app_url,
+        pat,
         "garmin-connect-health.json",
         health_bytes,
         "application/json",
@@ -320,8 +298,8 @@ def main() -> int:
     if fits:
         uploaded = []
         for name, data in fits:
-            stored = upload_storage(
-                subdomain, region, jwt, name, data, "application/octet-stream"
+            stored = upload_via_ingest(
+                app_url, pat, name, data, "application/octet-stream"
             )
             uploaded.append(
                 {
