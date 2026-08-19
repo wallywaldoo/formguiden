@@ -4,8 +4,7 @@ import { z } from "zod";
 import { startImportFromUploadedFiles } from "@/features/imports/start-import";
 import { withBearerAuth } from "@/lib/api/bearer";
 import { isOverIngestRateLimit } from "@/lib/api/ingest-limit";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_RECENT_IMPORTS } from "@/lib/graphql/queries/imports";
+import sql from "@/lib/db";
 import { provenanceSchema } from "@/lib/import/garmin-connect/schema";
 
 export const maxDuration = 30;
@@ -49,12 +48,13 @@ export async function POST(request: Request) {
     }
 
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const recent = await graphqlRequest<{
-      data_imports: Array<{ created_at: string }>;
-    }>(LIST_RECENT_IMPORTS, { since });
-    if (
-      isOverIngestRateLimit(recent.data_imports.map((row) => row.created_at))
-    ) {
+    const recent = await sql`
+      SELECT created_at FROM data_imports
+      WHERE created_at >= ${since}
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    if (isOverIngestRateLimit(recent.map((row) => row.created_at as string))) {
       return NextResponse.json(
         { error: "För många automatiska importer idag. Försök imorgon." },
         { status: 429 },

@@ -7,53 +7,24 @@ import {
   buildGoalPayload,
   goalSnapshotFields,
 } from "@/features/goals/map-goal";
-import { graphqlRequest } from "@/lib/graphql/client";
-import {
-  COMPLETE_ONBOARDING,
-  INSERT_AUDIT_EVENT,
-  INSERT_FILE_INTEGRATION,
-  INSERT_GOAL,
-  INSERT_GOAL_SNAPSHOT,
-  INSERT_PREFERENCES,
-  INSERT_PRIVACY_ACKNOWLEDGEMENT,
-  INSERT_PROFILE,
-  UPDATE_GOAL,
-  UPDATE_PREFERENCES,
-  UPDATE_PROFILE,
-} from "@/lib/graphql/mutations/profile";
-import { GET_PROFILE_SETTINGS } from "@/lib/graphql/queries/profile";
-import { createNhostClient } from "@/lib/nhost/server";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import {
   DEFAULT_LOCALE,
-  PRIVACY_DOCUMENT_VERSION,
   type RaceType,
 } from "@/lib/constants";
 import { goalInputSchema, onboardingSchema } from "@/lib/validation/profile";
 
 type ActionResult = { error?: string };
 
-type ProfileSettingsData = {
-  profiles: Array<{
-    user_id: string;
-    display_name: string | null;
-    onboarding_completed_at: string | null;
-  }>;
-  user_preferences: Array<{ id: string }>;
-  goals: Array<{ id: string }>;
-};
-
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-  return (
-    message.includes("uniqueness") ||
-    message.includes("duplicate key") ||
-    message.includes("unique constraint")
-  );
+async function requireSession(): Promise<void> {
+  const ok = await getSession();
+  if (!ok) throw new Error("Du är inte inloggad.");
 }
 
 export async function completeOnboardingAction(
@@ -84,9 +55,9 @@ export async function completeOnboardingAction(
     return { error: parsed.error.issues[0]?.message ?? "Ogiltiga uppgifter." };
   }
 
-  const nhost = await createNhostClient();
-  const userId = nhost.getUserSession()?.user?.id;
-  if (!userId) {
+  try {
+    await requireSession();
+  } catch {
     return { error: "Du är inte inloggad." };
   }
 
@@ -108,87 +79,113 @@ export async function completeOnboardingAction(
   }
 
   try {
-    try {
-      await graphqlRequest(INSERT_PRIVACY_ACKNOWLEDGEMENT, {
-        document_version: PRIVACY_DOCUMENT_VERSION,
-      });
-    } catch (error) {
-      if (!isUniqueViolation(error)) {
-        throw error;
-      }
-    }
-
-    const existing =
-      await graphqlRequest<ProfileSettingsData>(GET_PROFILE_SETTINGS);
-    const profile = existing.profiles[0];
-    const preferences = existing.user_preferences[0];
-    const existingGoal = existing.goals[0];
+    const profiles = await sql`SELECT id FROM profiles LIMIT 1`;
+    const profile = profiles[0];
 
     if (profile) {
-      await graphqlRequest(UPDATE_PROFILE, {
-        user_id: userId,
-        display_name: parsed.data.displayName || null,
-      });
+      await sql`
+        UPDATE profiles SET display_name = ${parsed.data.displayName || null}
+        WHERE id = ${profile.id}
+      `;
     } else {
-      await graphqlRequest(INSERT_PROFILE, {
-        display_name: parsed.data.displayName || null,
-      });
+      await sql`
+        INSERT INTO profiles (display_name, onboarding_completed_at)
+        VALUES (${parsed.data.displayName || null}, NULL)
+      `;
     }
 
-    if (preferences) {
-      await graphqlRequest(UPDATE_PREFERENCES, {
-        id: preferences.id,
-        timezone: parsed.data.timezone,
-        distance_unit: parsed.data.distanceUnit,
-        mass_unit: parsed.data.massUnit,
-        elevation_unit: parsed.data.elevationUnit,
-        volume_unit: parsed.data.volumeUnit,
-        temperature_unit: parsed.data.temperatureUnit,
-      });
+    const prefs = await sql`SELECT id FROM user_preferences LIMIT 1`;
+    const pref = prefs[0];
+    if (pref) {
+      await sql`
+        UPDATE user_preferences SET
+          timezone = ${parsed.data.timezone},
+          distance_unit = ${parsed.data.distanceUnit},
+          mass_unit = ${parsed.data.massUnit},
+          elevation_unit = ${parsed.data.elevationUnit},
+          volume_unit = ${parsed.data.volumeUnit},
+          temperature_unit = ${parsed.data.temperatureUnit}
+        WHERE id = ${pref.id}
+      `;
     } else {
-      await graphqlRequest(INSERT_PREFERENCES, {
-        timezone: parsed.data.timezone,
-        locale: DEFAULT_LOCALE,
-        distance_unit: parsed.data.distanceUnit,
-        mass_unit: parsed.data.massUnit,
-        elevation_unit: parsed.data.elevationUnit,
-        volume_unit: parsed.data.volumeUnit,
-        temperature_unit: parsed.data.temperatureUnit,
-      });
+      await sql`
+        INSERT INTO user_preferences
+          (timezone, locale, week_starts_on, distance_unit, mass_unit, elevation_unit, volume_unit, temperature_unit)
+        VALUES
+          (${parsed.data.timezone}, ${DEFAULT_LOCALE}, 1, ${parsed.data.distanceUnit},
+           ${parsed.data.massUnit}, ${parsed.data.elevationUnit}, ${parsed.data.volumeUnit},
+           ${parsed.data.temperatureUnit})
+      `;
     }
 
+    const goals = await sql`SELECT id FROM goals WHERE status = 'active' LIMIT 1`;
+    const existingGoal = goals[0];
     if (existingGoal) {
-      await graphqlRequest(UPDATE_GOAL, { id: existingGoal.id, ...goal });
-      await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
-        goal_id: existingGoal.id,
-        ...goalSnapshot,
-      });
+      await sql`
+        UPDATE goals SET
+          race_type = ${goal.race_type},
+          race_distance_m = ${goal.race_distance_m},
+          race_date = ${goal.race_date},
+          target_duration_s = ${goal.target_duration_s},
+          target_pace_s_per_km = ${goal.target_pace_s_per_km},
+          target_mass_kg = ${goal.target_mass_kg},
+          weekly_run_distance_m = ${goal.weekly_run_distance_m},
+          weekly_run_duration_s = ${goal.weekly_run_duration_s},
+          weekly_strength_sessions = ${goal.weekly_strength_sessions},
+          weekly_strength_duration_s = ${goal.weekly_strength_duration_s},
+          notes = ${goal.notes}
+        WHERE id = ${existingGoal.id}
+      `;
+      await sql`
+        INSERT INTO goal_snapshots
+          (goal_id, source, race_type, race_distance_m, race_date, target_duration_s,
+           target_pace_s_per_km, target_mass_kg, weekly_run_distance_m, weekly_run_duration_s,
+           weekly_strength_sessions, weekly_strength_duration_s)
+        VALUES
+          (${existingGoal.id}, 'user_edit', ${goalSnapshot.race_type}, ${goalSnapshot.race_distance_m},
+           ${goalSnapshot.race_date}, ${goalSnapshot.target_duration_s}, ${goalSnapshot.target_pace_s_per_km},
+           ${goalSnapshot.target_mass_kg}, ${goalSnapshot.weekly_run_distance_m}, ${goalSnapshot.weekly_run_duration_s},
+           ${goalSnapshot.weekly_strength_sessions}, ${goalSnapshot.weekly_strength_duration_s})
+      `;
     } else {
-      const inserted = await graphqlRequest<{
-        insert_goals_one: { id: string };
-      }>(INSERT_GOAL, { status: "active", ...goal });
-      await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
-        goal_id: inserted.insert_goals_one.id,
-        ...goalSnapshot,
-      });
+      const inserted = await sql`
+        INSERT INTO goals
+          (status, race_type, race_distance_m, race_date, target_duration_s, target_pace_s_per_km,
+           target_mass_kg, weekly_run_distance_m, weekly_run_duration_s, weekly_strength_sessions,
+           weekly_strength_duration_s, notes)
+        VALUES
+          ('active', ${goal.race_type}, ${goal.race_distance_m}, ${goal.race_date},
+           ${goal.target_duration_s}, ${goal.target_pace_s_per_km}, ${goal.target_mass_kg},
+           ${goal.weekly_run_distance_m}, ${goal.weekly_run_duration_s}, ${goal.weekly_strength_sessions},
+           ${goal.weekly_strength_duration_s}, ${goal.notes})
+        RETURNING id
+      `;
+      const goalId = inserted[0]!.id;
+      await sql`
+        INSERT INTO goal_snapshots
+          (goal_id, source, race_type, race_distance_m, race_date, target_duration_s,
+           target_pace_s_per_km, target_mass_kg, weekly_run_distance_m, weekly_run_duration_s,
+           weekly_strength_sessions, weekly_strength_duration_s)
+        VALUES
+          (${goalId}, 'user_edit', ${goalSnapshot.race_type}, ${goalSnapshot.race_distance_m},
+           ${goalSnapshot.race_date}, ${goalSnapshot.target_duration_s}, ${goalSnapshot.target_pace_s_per_km},
+           ${goalSnapshot.target_mass_kg}, ${goalSnapshot.weekly_run_distance_m}, ${goalSnapshot.weekly_run_duration_s},
+           ${goalSnapshot.weekly_strength_sessions}, ${goalSnapshot.weekly_strength_duration_s})
+      `;
     }
 
-    try {
-      await graphqlRequest(INSERT_FILE_INTEGRATION);
-    } catch {
-      // Unique (user_id, provider) — already present is fine.
-    }
+    // Ensure garmin-file integration exists (ignore unique conflict)
+    await sql`
+      INSERT INTO integrations (provider, status)
+      VALUES ('garmin-file', 'active')
+      ON CONFLICT (provider) DO NOTHING
+    `;
 
-    await graphqlRequest(COMPLETE_ONBOARDING, {
-      user_id: userId,
-      completed_at: new Date().toISOString(),
-    });
-
-    await graphqlRequest(INSERT_AUDIT_EVENT, {
-      action: "onboarding.complete",
-      entity_type: "profiles",
-      entity_id: userId,
-    });
+    // Mark onboarding complete
+    await sql`
+      UPDATE profiles SET onboarding_completed_at = now()
+      WHERE onboarding_completed_at IS NULL
+    `;
   } catch (error) {
     return {
       error:
@@ -205,33 +202,32 @@ export async function updateProfileSettingsAction(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const nhost = await createNhostClient();
-  const userId = nhost.getUserSession()?.user?.id;
-  if (!userId) {
+  try {
+    await requireSession();
+  } catch {
     return { error: "Du är inte inloggad." };
   }
 
   try {
-    const existing =
-      await graphqlRequest<ProfileSettingsData>(GET_PROFILE_SETTINGS);
-    const preferences = existing.user_preferences[0];
-    if (!preferences) {
+    const prefs = await sql`SELECT id FROM user_preferences LIMIT 1`;
+    const pref = prefs[0];
+    if (!pref) {
       return { error: "Inställningar saknas. Gå igenom onboarding igen." };
     }
 
-    await graphqlRequest(UPDATE_PROFILE, {
-      user_id: userId,
-      display_name: formString(formData, "displayName") || null,
-    });
-    await graphqlRequest(UPDATE_PREFERENCES, {
-      id: preferences.id,
-      timezone: formString(formData, "timezone"),
-      distance_unit: formString(formData, "distanceUnit"),
-      mass_unit: formString(formData, "massUnit"),
-      elevation_unit: formString(formData, "elevationUnit"),
-      volume_unit: formString(formData, "volumeUnit"),
-      temperature_unit: formString(formData, "temperatureUnit"),
-    });
+    await sql`
+      UPDATE profiles SET display_name = ${formString(formData, "displayName") || null}
+    `;
+    await sql`
+      UPDATE user_preferences SET
+        timezone = ${formString(formData, "timezone")},
+        distance_unit = ${formString(formData, "distanceUnit")},
+        mass_unit = ${formString(formData, "massUnit")},
+        elevation_unit = ${formString(formData, "elevationUnit")},
+        volume_unit = ${formString(formData, "volumeUnit")},
+        temperature_unit = ${formString(formData, "temperatureUnit")}
+      WHERE id = ${pref.id}
+    `;
   } catch (error) {
     return {
       error:
@@ -280,23 +276,66 @@ export async function updateGoalAction(
   const goalSnapshot = goalSnapshotFields(goal);
 
   try {
-    const existing =
-      await graphqlRequest<ProfileSettingsData>(GET_PROFILE_SETTINGS);
-    const current = existing.goals[0];
+    await requireSession();
+  } catch {
+    return { error: "Du är inte inloggad." };
+  }
+
+  try {
+    const goals = await sql`SELECT id FROM goals WHERE status = 'active' LIMIT 1`;
+    const current = goals[0];
     if (!current) {
-      const inserted = await graphqlRequest<{
-        insert_goals_one: { id: string };
-      }>(INSERT_GOAL, { status: "active", ...goal });
-      await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
-        goal_id: inserted.insert_goals_one.id,
-        ...goalSnapshot,
-      });
+      const inserted = await sql`
+        INSERT INTO goals
+          (status, race_type, race_distance_m, race_date, target_duration_s, target_pace_s_per_km,
+           target_mass_kg, weekly_run_distance_m, weekly_run_duration_s, weekly_strength_sessions,
+           weekly_strength_duration_s, notes)
+        VALUES
+          ('active', ${goal.race_type}, ${goal.race_distance_m}, ${goal.race_date},
+           ${goal.target_duration_s}, ${goal.target_pace_s_per_km}, ${goal.target_mass_kg},
+           ${goal.weekly_run_distance_m}, ${goal.weekly_run_duration_s}, ${goal.weekly_strength_sessions},
+           ${goal.weekly_strength_duration_s}, ${goal.notes})
+        RETURNING id
+      `;
+      const goalId = inserted[0]!.id;
+      await sql`
+        INSERT INTO goal_snapshots
+          (goal_id, source, race_type, race_distance_m, race_date, target_duration_s,
+           target_pace_s_per_km, target_mass_kg, weekly_run_distance_m, weekly_run_duration_s,
+           weekly_strength_sessions, weekly_strength_duration_s)
+        VALUES
+          (${goalId}, 'user_edit', ${goalSnapshot.race_type}, ${goalSnapshot.race_distance_m},
+           ${goalSnapshot.race_date}, ${goalSnapshot.target_duration_s}, ${goalSnapshot.target_pace_s_per_km},
+           ${goalSnapshot.target_mass_kg}, ${goalSnapshot.weekly_run_distance_m}, ${goalSnapshot.weekly_run_duration_s},
+           ${goalSnapshot.weekly_strength_sessions}, ${goalSnapshot.weekly_strength_duration_s})
+      `;
     } else {
-      await graphqlRequest(UPDATE_GOAL, { id: current.id, ...goal });
-      await graphqlRequest(INSERT_GOAL_SNAPSHOT, {
-        goal_id: current.id,
-        ...goalSnapshot,
-      });
+      await sql`
+        UPDATE goals SET
+          race_type = ${goal.race_type},
+          race_distance_m = ${goal.race_distance_m},
+          race_date = ${goal.race_date},
+          target_duration_s = ${goal.target_duration_s},
+          target_pace_s_per_km = ${goal.target_pace_s_per_km},
+          target_mass_kg = ${goal.target_mass_kg},
+          weekly_run_distance_m = ${goal.weekly_run_distance_m},
+          weekly_run_duration_s = ${goal.weekly_run_duration_s},
+          weekly_strength_sessions = ${goal.weekly_strength_sessions},
+          weekly_strength_duration_s = ${goal.weekly_strength_duration_s},
+          notes = ${goal.notes}
+        WHERE id = ${current.id}
+      `;
+      await sql`
+        INSERT INTO goal_snapshots
+          (goal_id, source, race_type, race_distance_m, race_date, target_duration_s,
+           target_pace_s_per_km, target_mass_kg, weekly_run_distance_m, weekly_run_duration_s,
+           weekly_strength_sessions, weekly_strength_duration_s)
+        VALUES
+          (${current.id}, 'user_edit', ${goalSnapshot.race_type}, ${goalSnapshot.race_distance_m},
+           ${goalSnapshot.race_date}, ${goalSnapshot.target_duration_s}, ${goalSnapshot.target_pace_s_per_km},
+           ${goalSnapshot.target_mass_kg}, ${goalSnapshot.weekly_run_distance_m}, ${goalSnapshot.weekly_run_duration_s},
+           ${goalSnapshot.weekly_strength_sessions}, ${goalSnapshot.weekly_strength_duration_s})
+      `;
     }
   } catch (error) {
     return {

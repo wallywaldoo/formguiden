@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { processExportJob } from "@/features/export/process-export";
-import { getSessionUserId } from "@/lib/nhost/server";
+import { getSession } from "@/lib/auth";
 
 export const maxDuration = 30;
 
@@ -9,8 +9,8 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const userId = await getSessionUserId();
-  if (!userId) {
+  const ok = await getSession();
+  if (!ok) {
     return NextResponse.json(
       { error: "Du är inte inloggad." },
       { status: 401 },

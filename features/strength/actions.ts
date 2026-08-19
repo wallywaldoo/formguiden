@@ -4,16 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { fromDatetimeLocal } from "@/lib/analytics/dates";
-import { graphqlRequest } from "@/lib/graphql/client";
-import {
-  DELETE_STRENGTH_SESSION,
-  DELETE_STRENGTH_SET,
-  INSERT_STRENGTH_SESSION,
-  INSERT_STRENGTH_SET,
-  UPDATE_STRENGTH_SESSION,
-} from "@/lib/graphql/mutations/logging";
-import { GET_STRENGTH_SESSION } from "@/lib/graphql/queries/logging";
-import { createNhostClient } from "@/lib/nhost/server";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { massToKg } from "@/lib/units/convert";
 import {
   idSchema,
@@ -29,11 +21,9 @@ function formValues(formData: FormData): Record<string, string> {
   );
 }
 
-async function requireUserId() {
-  const nhost = await createNhostClient();
-  if (!nhost.getUserSession()?.user?.id) {
-    throw new Error("Du är inte inloggad.");
-  }
+async function requireSession(): Promise<void> {
+  const ok = await getSession();
+  if (!ok) throw new Error("Du är inte inloggad.");
 }
 
 export async function createStrengthSessionAction(
@@ -48,22 +38,19 @@ export async function createStrengthSessionAction(
   }
   let sessionId: string | undefined;
   try {
-    await requireUserId();
-    const created = await graphqlRequest<{
-      insert_strength_sessions_one: { id: string };
-    }>(INSERT_STRENGTH_SESSION, {
-      started_at: fromDatetimeLocal(
-        parsed.data.startedAtLocal,
-        parsed.data.timeZone,
-      ),
-      duration_s:
-        parsed.data.durationMinutes != null
-          ? parsed.data.durationMinutes * 60
-          : null,
-      perceived_effort: parsed.data.perceivedEffort,
-      notes: parsed.data.notes || null,
-    });
-    sessionId = created.insert_strength_sessions_one.id;
+    await requireSession();
+    const created = await sql`
+      INSERT INTO strength_sessions (started_at, duration_s, perceived_effort, notes, source)
+      VALUES (
+        ${fromDatetimeLocal(parsed.data.startedAtLocal, parsed.data.timeZone)},
+        ${parsed.data.durationMinutes != null ? parsed.data.durationMinutes * 60 : null},
+        ${parsed.data.perceivedEffort},
+        ${parsed.data.notes || null},
+        'manual'
+      )
+      RETURNING id
+    `;
+    sessionId = created[0]!.id;
   } catch {
     return { error: "Kunde inte spara passet." };
   }
@@ -89,20 +76,15 @@ export async function updateStrengthSessionAction(
     };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(UPDATE_STRENGTH_SESSION, {
-      id: id.data,
-      started_at: fromDatetimeLocal(
-        parsed.data.startedAtLocal,
-        parsed.data.timeZone,
-      ),
-      duration_s:
-        parsed.data.durationMinutes != null
-          ? parsed.data.durationMinutes * 60
-          : null,
-      perceived_effort: parsed.data.perceivedEffort,
-      notes: parsed.data.notes || null,
-    });
+    await requireSession();
+    await sql`
+      UPDATE strength_sessions SET
+        started_at = ${fromDatetimeLocal(parsed.data.startedAtLocal, parsed.data.timeZone)},
+        duration_s = ${parsed.data.durationMinutes != null ? parsed.data.durationMinutes * 60 : null},
+        perceived_effort = ${parsed.data.perceivedEffort},
+        notes = ${parsed.data.notes || null}
+      WHERE id = ${id.data}
+    `;
     revalidatePath(`/strength/${id.data}`);
     revalidatePath("/strength");
     return { ok: true };
@@ -119,8 +101,8 @@ export async function deleteStrengthSessionAction(
     return { error: "Kunde inte ta bort passet." };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(DELETE_STRENGTH_SESSION, { id: parsed.data });
+    await requireSession();
+    await sql`DELETE FROM strength_sessions WHERE id = ${parsed.data}`;
   } catch {
     return { error: "Kunde inte ta bort passet." };
   }
@@ -140,27 +122,25 @@ export async function addStrengthSetAction(
     };
   }
   try {
-    await requireUserId();
-    const existing = await graphqlRequest<{
-      strength_sets: Array<{ set_index: number }>;
-    }>(GET_STRENGTH_SESSION, { id: parsed.data.sessionId });
-    const nextIndex =
-      existing.strength_sets.reduce(
-        (max, set) => Math.max(max, set.set_index),
-        0,
-      ) + 1;
-    await graphqlRequest(INSERT_STRENGTH_SET, {
-      session_id: parsed.data.sessionId,
-      set_index: nextIndex,
-      exercise_name: parsed.data.exerciseName,
-      repetitions: parsed.data.repetitions,
-      mass_kg:
-        parsed.data.mass != null
-          ? massToKg(parsed.data.mass, parsed.data.massUnit)
-          : null,
-      rpe: parsed.data.rpe,
-      notes: parsed.data.notes || null,
-    });
+    await requireSession();
+    const rows = await sql`
+      SELECT COALESCE(MAX(set_index), 0) AS max_index
+      FROM strength_sets
+      WHERE session_id = ${parsed.data.sessionId}
+    `;
+    const nextIndex = (rows[0]!.max_index as number) + 1;
+    await sql`
+      INSERT INTO strength_sets (session_id, set_index, exercise_name, repetitions, mass_kg, rpe, notes)
+      VALUES (
+        ${parsed.data.sessionId},
+        ${nextIndex},
+        ${parsed.data.exerciseName},
+        ${parsed.data.repetitions},
+        ${parsed.data.mass != null ? massToKg(parsed.data.mass, parsed.data.massUnit) : null},
+        ${parsed.data.rpe},
+        ${parsed.data.notes || null}
+      )
+    `;
     revalidatePath(`/strength/${parsed.data.sessionId}`);
     revalidatePath("/strength");
     return { ok: true };
@@ -178,8 +158,8 @@ export async function deleteStrengthSetAction(
     return { error: "Kunde inte ta bort setet." };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(DELETE_STRENGTH_SET, { id: parsed.data });
+    await requireSession();
+    await sql`DELETE FROM strength_sets WHERE id = ${parsed.data}`;
     revalidatePath(`/strength/${sessionId.data}`);
     revalidatePath("/strength");
     return {};

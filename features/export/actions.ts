@@ -6,11 +6,8 @@ import {
   getExportDownloadUrl,
   processExportJob,
 } from "@/features/export/process-export";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { INSERT_AUDIT_EVENT } from "@/lib/graphql/mutations/profile";
-import { INSERT_EXPORT_JOB } from "@/lib/graphql/mutations/coaching";
-import { GET_EXPORT_JOB } from "@/lib/graphql/queries/coaching";
-import { createNhostClient } from "@/lib/nhost/server";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export type ExportActionResult = {
   error?: string;
@@ -18,27 +15,18 @@ export type ExportActionResult = {
   downloadUrl?: string;
 };
 
-async function requireUserId() {
-  const nhost = await createNhostClient();
-  const userId = nhost.getUserSession()?.user?.id;
-  if (!userId) {
-    throw new Error("Du är inte inloggad.");
-  }
-  return userId;
+async function requireSession(): Promise<void> {
+  const ok = await getSession();
+  if (!ok) throw new Error("Du är inte inloggad.");
 }
 
 export async function requestExportAction(): Promise<ExportActionResult> {
   try {
-    await requireUserId();
-    const created = await graphqlRequest<{
-      insert_data_export_jobs_one: { id: string };
-    }>(INSERT_EXPORT_JOB);
-    const jobId = created.insert_data_export_jobs_one.id;
-    await graphqlRequest(INSERT_AUDIT_EVENT, {
-      action: "export.request",
-      entity_type: "data_export_job",
-      entity_id: jobId,
-    });
+    await requireSession();
+    const created = await sql`
+      INSERT INTO data_export_jobs (status) VALUES ('queued') RETURNING id
+    `;
+    const jobId = created[0]!.id as string;
     revalidatePath("/settings/privacy");
     return { jobId };
   } catch (error) {
@@ -53,19 +41,12 @@ export async function processExportAction(
   jobId: string,
 ): Promise<ExportActionResult> {
   try {
-    await requireUserId();
+    await requireSession();
     const result = await processExportJob(jobId);
     if (result.status === "error") {
       return { error: result.error, jobId };
     }
-    const job = await graphqlRequest<{
-      data_export_jobs_by_pk: { storage_file_id: string | null } | null;
-    }>(GET_EXPORT_JOB, { id: jobId });
-    const fileId = job.data_export_jobs_by_pk?.storage_file_id;
-    if (!fileId) {
-      return { jobId, error: "Exportfilen saknas." };
-    }
-    const downloadUrl = await getExportDownloadUrl(fileId);
+    const downloadUrl = await getExportDownloadUrl(jobId);
     revalidatePath("/settings/privacy");
     return { jobId, downloadUrl: downloadUrl ?? undefined };
   } catch (error) {

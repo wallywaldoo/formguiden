@@ -3,12 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { fromDatetimeLocal } from "@/lib/analytics/dates";
-import { graphqlRequest } from "@/lib/graphql/client";
-import {
-  DELETE_HYDRATION_ENTRY,
-  INSERT_HYDRATION_ENTRY,
-} from "@/lib/graphql/mutations/logging";
-import { createNhostClient } from "@/lib/nhost/server";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { volumeToMl } from "@/lib/units/convert";
 import { hydrationEntrySchema, idSchema } from "@/lib/validation/logging";
 
@@ -20,11 +16,9 @@ function formValues(formData: FormData): Record<string, string> {
   );
 }
 
-async function requireUserId() {
-  const nhost = await createNhostClient();
-  if (!nhost.getUserSession()?.user?.id) {
-    throw new Error("Du är inte inloggad.");
-  }
+async function requireSession(): Promise<void> {
+  const ok = await getSession();
+  if (!ok) throw new Error("Du är inte inloggad.");
 }
 
 export async function createHydrationEntryAction(
@@ -38,17 +32,17 @@ export async function createHydrationEntryAction(
     };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(INSERT_HYDRATION_ENTRY, {
-      consumed_at: fromDatetimeLocal(
-        parsed.data.consumedAtLocal,
-        parsed.data.timeZone,
-      ),
-      volume_ml: volumeToMl(parsed.data.volume, parsed.data.volumeUnit),
-      beverage_type: parsed.data.beverageType,
-      caffeine_mg: parsed.data.caffeineMg,
-      notes: parsed.data.notes || null,
-    });
+    await requireSession();
+    await sql`
+      INSERT INTO hydration_entries (consumed_at, volume_ml, beverage_type, caffeine_mg, notes)
+      VALUES (
+        ${fromDatetimeLocal(parsed.data.consumedAtLocal, parsed.data.timeZone)},
+        ${volumeToMl(parsed.data.volume, parsed.data.volumeUnit)},
+        ${parsed.data.beverageType},
+        ${parsed.data.caffeineMg},
+        ${parsed.data.notes || null}
+      )
+    `;
     revalidatePath("/nutrition");
     revalidatePath("/overview");
     return { ok: true };
@@ -65,8 +59,8 @@ export async function deleteHydrationEntryAction(
     return { error: "Kunde inte ta bort." };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(DELETE_HYDRATION_ENTRY, { id: parsed.data });
+    await requireSession();
+    await sql`DELETE FROM hydration_entries WHERE id = ${parsed.data}`;
     revalidatePath("/nutrition");
     revalidatePath("/overview");
     return {};

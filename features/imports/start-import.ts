@@ -1,26 +1,13 @@
 import { z } from "zod";
 
-import { GARMIN_IMPORTS_BUCKET } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { INSERT_AUDIT_EVENT } from "@/lib/graphql/mutations/profile";
-import {
-  INSERT_DATA_IMPORT,
-  INSERT_IMPORT_FILE,
-  INSERT_IMPORT_JOB,
-  UPDATE_DATA_IMPORT,
-  UPDATE_IMPORT_FILE,
-} from "@/lib/graphql/mutations/imports";
-import {
-  GET_COMMITTED_FILES_BY_HASH,
-  GET_STORAGE_FILE,
-} from "@/lib/graphql/queries/imports";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import type { ImportProviderId } from "@/lib/import/adapters/types";
 import {
   IMPORT_SOURCE,
   MAX_UPLOAD_BYTES,
   MIN_UPLOAD_BYTES,
 } from "@/lib/import/limits";
-import { createNhostClient } from "@/lib/nhost/server";
 
 export const uploadedFileSchema = z.object({
   id: z.string().uuid(),
@@ -61,95 +48,67 @@ export async function startImportFromUploadedFiles(
     ? (input.provider as (typeof ingestProviders)[number])
     : IMPORT_SOURCE;
 
-  const nhost = await createNhostClient();
-  const userId = nhost.getUserSession()?.user?.id;
-  if (!userId) {
+  const ok = await getSession();
+  if (!ok) {
     return { error: "Du är inte inloggad." };
   }
 
   let importId: string | undefined;
   try {
-    const created = await graphqlRequest<{
-      insert_data_imports_one: { id: string };
-    }>(INSERT_DATA_IMPORT, {
-      provider,
-      status: "uploaded",
-      file_count: parsed.data.length,
-    });
-    importId = created.insert_data_imports_one.id;
+    const created = await sql`
+      INSERT INTO data_imports (provider, status, file_count)
+      VALUES (${provider}, 'uploaded', ${parsed.data.length})
+      RETURNING id
+    `;
+    importId = created[0]!.id as string;
 
     for (const file of parsed.data) {
-      const meta = await graphqlRequest<{
-        storage_files_by_pk: {
-          id: string;
-          bucket_id: string;
-          uploaded_by_user_id: string | null;
-          name: string;
-          size: number;
-          mime_type: string | null;
-        } | null;
-      }>(GET_STORAGE_FILE, { id: file.id });
-      const stored = meta.storage_files_by_pk;
-      if (
-        !stored ||
-        stored.bucket_id !== GARMIN_IMPORTS_BUCKET ||
-        stored.uploaded_by_user_id !== userId ||
-        stored.size !== file.size
-      ) {
-        throw new Error("En fil kunde inte kopplas till ditt konto.");
-      }
+      // Check if this hash is already committed (duplicate detection)
+      const committed = await sql`
+        SELECT id FROM import_files WHERE sha256 = ${file.sha256} AND status = 'committed' LIMIT 1
+      `;
+      const fileStatus = committed.length > 0 ? "duplicate" : "pending";
 
-      const committed = await graphqlRequest<{
-        import_files: Array<{ id: string }>;
-      }>(GET_COMMITTED_FILES_BY_HASH, { sha256: file.sha256 });
-
-      const inserted = await graphqlRequest<{
-        insert_import_files_one: { id: string };
-      }>(INSERT_IMPORT_FILE, {
-        import_id: importId,
-        storage_file_id: file.id,
-        original_filename: stored.name,
-        declared_mime_type: stored.mime_type,
-        detected_kind: null,
-        byte_size: stored.size,
-        sha256: file.sha256,
-        status: committed.import_files.length > 0 ? "duplicate" : "pending",
-      });
+      // Look up the storage path from import_files (previously uploaded via ingest API)
+      // For files uploaded via the upload endpoint, the storage_path is stored there.
+      // For single-user: we store bytes via storage_path referencing the filesystem or
+      // we trust the upload endpoint to have stored the file.
+      const inserted = await sql`
+        INSERT INTO import_files
+          (import_id, storage_path, original_filename, declared_mime_type,
+           detected_kind, byte_size, sha256, status)
+        VALUES (
+          ${importId}, ${file.id}, ${file.name}, ${file.type ?? null},
+          null, ${file.size}, ${file.sha256}, ${fileStatus}
+        )
+        RETURNING id
+      `;
       if (input.provenance) {
-        await graphqlRequest(UPDATE_IMPORT_FILE, {
-          id: inserted.insert_import_files_one.id,
-          set: { source_provenance: input.provenance },
-        });
+        await sql`
+          UPDATE import_files
+          SET source_provenance = ${JSON.stringify(input.provenance)}
+          WHERE id = ${inserted[0]!.id}
+        `;
       }
     }
 
-    await graphqlRequest(INSERT_IMPORT_JOB, {
-      import_id: importId,
-      cursor: {},
-    });
-    await graphqlRequest(UPDATE_DATA_IMPORT, {
-      id: importId,
-      set: { status: "queued" },
-    });
-    await graphqlRequest(INSERT_AUDIT_EVENT, {
-      action: "import.uploaded",
-      entity_type: "data_imports",
-      entity_id: importId,
-    });
+    await sql`
+      INSERT INTO import_jobs (import_id, cursor)
+      VALUES (${importId}, '{}')
+    `;
+    await sql`
+      UPDATE data_imports SET status = 'queued' WHERE id = ${importId}
+    `;
 
     return { importId };
   } catch (error) {
     if (importId) {
-      await graphqlRequest(UPDATE_DATA_IMPORT, {
-        id: importId,
-        set: {
-          status: "failed",
-          error_summary:
-            error instanceof Error
-              ? error.message
-              : "Kunde inte starta importen.",
-        },
-      }).catch(() => undefined);
+      await sql`
+        UPDATE data_imports SET
+          status = 'failed',
+          error_summary = ${error instanceof Error ? error.message : "Kunde inte starta importen."}
+        WHERE id = ${importId}
+      `.catch(() => undefined);
     }
     return {
       error:

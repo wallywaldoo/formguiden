@@ -3,11 +3,7 @@ import { z } from "zod";
 
 import { commitImport } from "@/features/imports/commit-import";
 import { withBearerAuth } from "@/lib/api/bearer";
-import { graphqlRequest } from "@/lib/graphql/client";
-import {
-  GET_IMPORT,
-  GET_LAST_COMMITTED_PROVENANCE,
-} from "@/lib/graphql/queries/imports";
+import sql from "@/lib/db";
 import {
   extractGarminConnectProvenance,
   provenanceAllowsAutoCommit,
@@ -26,12 +22,10 @@ export async function POST(
       return NextResponse.json({ error: "Ogiltig import." }, { status: 400 });
     }
 
-    const data = await graphqlRequest<{
-      data_imports_by_pk: { id: string; status: string } | null;
-      import_files: Array<{ source_provenance: unknown }>;
-    }>(GET_IMPORT, { id: parsed.data });
-
-    const importRow = data.data_imports_by_pk;
+    const importRows = await sql`
+      SELECT id, status FROM data_imports WHERE id = ${parsed.data} LIMIT 1
+    `;
+    const importRow = importRows[0];
     if (!importRow) {
       return NextResponse.json(
         { error: "Importen hittades inte." },
@@ -48,7 +42,7 @@ export async function POST(
       });
     }
 
-    if (!["preview_ready", "partial"].includes(importRow.status)) {
+    if (!["preview_ready", "partial"].includes(importRow.status as string)) {
       return NextResponse.json({
         importId: parsed.data,
         importStatus: importRow.status,
@@ -57,15 +51,21 @@ export async function POST(
       });
     }
 
-    const current = data.import_files
+    // Read provenance from import files to check auto-commit eligibility
+    const currentFiles = await sql`
+      SELECT source_provenance FROM import_files WHERE import_id = ${parsed.data}
+    `;
+    const current = currentFiles
       .map((file) => extractGarminConnectProvenance(file.source_provenance))
       .find((value) => value !== null);
 
-    const previous = await graphqlRequest<{
-      import_files: Array<{ source_provenance: unknown }>;
-    }>(GET_LAST_COMMITTED_PROVENANCE);
-
-    const lastApproved = previous.import_files
+    const previousFiles = await sql`
+      SELECT source_provenance FROM import_files
+      WHERE status = 'committed' AND source_provenance IS NOT NULL
+      ORDER BY updated_at DESC
+      LIMIT 20
+    `;
+    const lastApproved = previousFiles
       .map((file) => extractGarminConnectProvenance(file.source_provenance))
       .find((value) => value !== null);
 

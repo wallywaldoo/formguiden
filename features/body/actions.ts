@@ -3,12 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { fromDatetimeLocal } from "@/lib/analytics/dates";
-import { graphqlRequest } from "@/lib/graphql/client";
-import {
-  DELETE_BODY_MEASUREMENT,
-  INSERT_MANUAL_BODY_MEASUREMENT,
-} from "@/lib/graphql/mutations/logging";
-import { createNhostClient } from "@/lib/nhost/server";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { massToKg } from "@/lib/units/convert";
 import { idSchema, weightEntrySchema } from "@/lib/validation/logging";
 
@@ -20,11 +16,9 @@ function formValues(formData: FormData): Record<string, string> {
   );
 }
 
-async function requireUserId() {
-  const nhost = await createNhostClient();
-  if (!nhost.getUserSession()?.user?.id) {
-    throw new Error("Du är inte inloggad.");
-  }
+async function requireSession(): Promise<void> {
+  const ok = await getSession();
+  if (!ok) throw new Error("Du är inte inloggad.");
 }
 
 export async function createWeightEntryAction(
@@ -38,16 +32,17 @@ export async function createWeightEntryAction(
     };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(INSERT_MANUAL_BODY_MEASUREMENT, {
-      measured_at: fromDatetimeLocal(
-        parsed.data.measuredAtLocal,
-        parsed.data.timeZone,
-      ),
-      mass_kg: massToKg(parsed.data.mass, parsed.data.massUnit),
-      body_fat_pct: parsed.data.bodyFatPct,
-      notes: parsed.data.notes || null,
-    });
+    await requireSession();
+    await sql`
+      INSERT INTO body_measurements (measured_at, source, mass_kg, body_fat_pct, notes)
+      VALUES (
+        ${fromDatetimeLocal(parsed.data.measuredAtLocal, parsed.data.timeZone)},
+        'manual',
+        ${massToKg(parsed.data.mass, parsed.data.massUnit)},
+        ${parsed.data.bodyFatPct},
+        ${parsed.data.notes || null}
+      )
+    `;
     revalidatePath("/body");
     revalidatePath("/overview");
     return { ok: true };
@@ -64,8 +59,8 @@ export async function deleteWeightEntryAction(
     return { error: "Kunde inte ta bort." };
   }
   try {
-    await requireUserId();
-    await graphqlRequest(DELETE_BODY_MEASUREMENT, { id: parsed.data });
+    await requireSession();
+    await sql`DELETE FROM body_measurements WHERE id = ${parsed.data}`;
     revalidatePath("/body");
     revalidatePath("/overview");
     return {};

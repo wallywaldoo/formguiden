@@ -81,7 +81,7 @@ def sha256_hex(data: bytes) -> str:
 
 def upload_via_ingest(
     app_url: str,
-    pat: str,
+    token: str,
     filename: str,
     data: bytes,
     mime: str,
@@ -90,7 +90,7 @@ def upload_via_ingest(
 
     response = requests.post(
         f"{app_url.rstrip('/')}/api/ingest/upload",
-        headers={"Authorization": f"Bearer {pat}"},
+        headers={"Authorization": f"Bearer {token}"},
         files={"file": (filename, data, mime)},
         timeout=60,
     )
@@ -247,7 +247,6 @@ CHUNK_DAYS = 30  # max days per health-data batch to avoid server timeouts
 
 def sync_health_chunk(
     app_url: str,
-    pat: str,
     jwt: str,
     provenance: dict[str, Any],
     client: Any,
@@ -263,10 +262,8 @@ def sync_health_chunk(
         "bodyMeasurements": health["bodyMeasurements"],
     }
     health_bytes = json.dumps(payload).encode("utf-8")
-    # Upload uses PAT so server can derive userId; ingest uses JWT to avoid
-    # repeated PAT-exchange round-trips.
     health_file = upload_via_ingest(
-        app_url, pat, "garmin-connect-health.json", health_bytes, "application/json"
+        app_url, jwt, "garmin-connect-health.json", health_bytes, "application/json"
     )
     started = ingest(
         app_url,
@@ -339,7 +336,7 @@ def main() -> int:
         chunk_start = max(start, chunk_end - timedelta(days=CHUNK_DAYS - 1))
         print(f"Hälsodata {chunk_start}–{chunk_end}…")
         try:
-            result = sync_health_chunk(app_url, pat, jwt, provenance, client, chunk_start, chunk_end)
+            result = sync_health_chunk(app_url, jwt, provenance, client, chunk_start, chunk_end)
             print(f"  → {result}")
         except Exception as err:
             print(f"  Fel: {err}", file=sys.stderr)
@@ -350,7 +347,7 @@ def main() -> int:
         uploaded = []
         for name, data in fits:
             stored = upload_via_ingest(
-                app_url, pat, name, data, "application/octet-stream"
+                app_url, jwt, name, data, "application/octet-stream"
             )
             uploaded.append(
                 {

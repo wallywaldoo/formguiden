@@ -8,13 +8,8 @@ import {
   startImportFromUploadedFiles,
   uploadedFileSchema,
 } from "@/features/imports/start-import";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { INSERT_AUDIT_EVENT } from "@/lib/graphql/mutations/profile";
-import {
-  DELETE_PREVIEWS,
-  UPDATE_DATA_IMPORT,
-} from "@/lib/graphql/mutations/imports";
-import { createNhostClient } from "@/lib/nhost/server";
+import sql from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 const importIdSchema = z.string().uuid();
 
@@ -23,13 +18,9 @@ export type ImportActionResult = {
   importId?: string;
 };
 
-async function requireUserId() {
-  const nhost = await createNhostClient();
-  const userId = nhost.getUserSession()?.user?.id;
-  if (!userId) {
-    throw new Error("Du är inte inloggad.");
-  }
-  return { nhost, userId };
+async function requireSession(): Promise<void> {
+  const ok = await getSession();
+  if (!ok) throw new Error("Du är inte inloggad.");
 }
 
 export async function startImportAction(
@@ -81,17 +72,12 @@ export async function abandonImportAction(
   }
 
   try {
-    await requireUserId();
-    await graphqlRequest(DELETE_PREVIEWS, { import_id: parsedId.data });
-    await graphqlRequest(UPDATE_DATA_IMPORT, {
-      id: parsedId.data,
-      set: { status: "abandoned" },
-    });
-    await graphqlRequest(INSERT_AUDIT_EVENT, {
-      action: "import.abandon",
-      entity_type: "data_imports",
-      entity_id: parsedId.data,
-    });
+    await requireSession();
+    // Cascade delete removes lap previews too
+    await sql`DELETE FROM activity_previews WHERE import_id = ${parsedId.data}`;
+    await sql`DELETE FROM daily_health_metric_previews WHERE import_id = ${parsedId.data}`;
+    await sql`DELETE FROM body_measurement_previews WHERE import_id = ${parsedId.data}`;
+    await sql`UPDATE data_imports SET status = 'abandoned' WHERE id = ${parsedId.data}`;
     revalidatePath("/import");
     return { importId: parsedId.data };
   } catch (error) {
