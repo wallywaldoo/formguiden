@@ -131,6 +131,24 @@ export async function getDashboardData(since: string, sinceDate: string) {
   };
 }
 
+export async function getGarminIntegrationStatus() {
+  const rows = await sql`
+    SELECT provider, status, connected_at, metadata
+    FROM integrations
+    WHERE provider = 'garmin-api'
+    LIMIT 1
+  `;
+
+  return (rows[0] ?? null) as
+    | {
+        provider: string;
+        status: string;
+        connected_at: string | null;
+        metadata: Record<string, unknown> | null;
+      }
+    | null;
+}
+
 // ─── Activities ───────────────────────────────────────────────────────────────
 
 export async function listActivities(since: string) {

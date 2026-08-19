@@ -15,9 +15,16 @@ function createSql() {
   } catch {
     throw new Error("POSTGRES_URL environment variable is invalid");
   }
+  const url = new URL(connectionString);
+  const sslMode = url.searchParams.get("sslmode");
+
   return postgres(connectionString, {
-    // Vercel Postgres uses SSL in production
-    ssl: process.env.NODE_ENV === "production" ? "require" : false,
+    // Respect the connection string locally too, since hosted Postgres
+    // providers like Prisma Postgres can require SSL outside production.
+    ssl:
+      sslMode === "require" || process.env.NODE_ENV === "production"
+        ? "require"
+        : false,
     // Keep pool small — single user, serverless functions
     max: 5,
     idle_timeout: 20,

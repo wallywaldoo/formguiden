@@ -168,7 +168,14 @@ export class GarminClient {
     if (!raw.trim().startsWith("{")) {
       decoded = Buffer.from(raw, "base64").toString("utf-8");
     }
-    const session = JSON.parse(decoded) as GarminSession;
+    let session: GarminSession;
+    try {
+      session = JSON.parse(decoded) as GarminSession;
+    } catch {
+      throw new Error(
+        "GARMIN_SESSION is not valid Garmin session JSON. Reconnect Garmin and save the real token payload, not a placeholder value.",
+      );
+    }
     return new GarminClient(session);
   }
 

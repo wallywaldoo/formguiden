@@ -64,17 +64,17 @@ function NavSection({
 
   return (
     <div className="space-y-3">
-      <p className="px-2 text-[0.68rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+      <p className="px-2 text-[0.68rem] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
         {title}
       </p>
-      <nav className="flex flex-col gap-1.5">
+      <nav className="flex flex-col gap-1">
         {links.map((link) => (
           <Link
             key={link.href}
             href={link.href}
             onClick={onNavigate}
             className={cn(
-              "group flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-[0.95rem] transition-all",
+              "group flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-2.5 text-[0.93rem] transition-all",
               pathname === link.href || pathname.startsWith(`${link.href}/`)
                 ? "glass-panel-soft ambient-divider border-white/60 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_10px_28px_rgba(72,87,120,0.12)]"
                 : "border-transparent text-muted-foreground hover:bg-white/50 hover:text-foreground",
@@ -89,7 +89,7 @@ function NavSection({
             <span className="flex items-center gap-3">
               <span
                 className={cn(
-                  "flex size-9 items-center justify-center rounded-xl border transition-colors",
+                  "flex size-8.5 items-center justify-center rounded-xl border transition-colors",
                   pathname === link.href || pathname.startsWith(`${link.href}/`)
                     ? "border-white/70 bg-white/70 text-primary"
                     : "border-white/50 bg-white/45 text-muted-foreground group-hover:text-primary",
@@ -100,7 +100,7 @@ function NavSection({
               <span className="font-medium tracking-[-0.015em]">{link.label}</span>
             </span>
             {link.featured ? (
-              <span className="rounded-full bg-primary/10 px-2 py-1 text-[0.66rem] font-semibold tracking-[0.02em] text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-1 text-[0.64rem] font-semibold tracking-[0.02em] text-primary">
                 Ny
               </span>
             ) : null}
@@ -174,48 +174,47 @@ export function AppShell({
       <div className="mx-auto flex w-full max-w-7xl gap-6 px-3 pb-6 pt-3 md:px-5 md:pt-5">
         <aside className="sticky top-5 hidden h-[calc(100svh-2.5rem)] w-[19rem] shrink-0 md:flex">
           <div className="glass-nav ambient-divider flex w-full flex-col rounded-[2rem] border p-4">
-            <div className="space-y-5 p-2">
-              <div className="space-y-2">
+            <div className="space-y-4 p-2">
+              <div className="space-y-1.5">
                 <Link
                   href="/overview"
-                  className="block text-[1.5rem] font-semibold tracking-[-0.055em]"
+                  className="block text-[1.35rem] font-semibold tracking-[-0.04em]"
                 >
                   Formkurvan
                 </Link>
-                <p className="max-w-[16rem] text-[0.98rem] leading-7 text-muted-foreground">
-                  Dagens träningsbild, återhämtning och nästa steg i en lugn,
-                  snabbskannad vy.
+                <p className="max-w-[15rem] text-[0.9rem] leading-6 text-muted-foreground">
+                  Dagens läge, återhämtning och nästa steg i en lugn vy.
                 </p>
               </div>
               <Link
                 href="/coach"
-                className="glass-panel-soft ambient-divider flex items-start gap-3 rounded-[1.6rem] border p-4 text-left transition-transform hover:-translate-y-0.5"
+                className="glass-panel-soft ambient-divider flex items-start gap-3 rounded-[1.5rem] border p-4 text-left transition-transform hover:-translate-y-0.5"
               >
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,rgba(111,154,255,0.22),rgba(182,207,255,0.5))] text-primary">
                   <MessageCircleHeart className="size-5" />
                 </span>
                 <span className="space-y-1">
-                  <span className="block text-[0.98rem] font-semibold tracking-[-0.02em] text-foreground">
+                  <span className="block text-[0.95rem] font-semibold tracking-[-0.02em] text-foreground">
                     Öppna Coach
                   </span>
-                  <span className="block text-[0.95rem] leading-6 text-muted-foreground">
-                    Fråga direkt utifrån senaste pass, återhämtning och mål.
+                  <span className="block text-[0.88rem] leading-6 text-muted-foreground">
+                    Få resonemang utifrån senaste pass, återhämtning och mål.
                   </span>
                 </span>
               </Link>
             </div>
 
-            <div className="mt-6 space-y-6 overflow-y-auto px-2 pb-4">
+            <div className="mt-5 space-y-5 overflow-y-auto px-2 pb-4">
               <NavSection title="Daglig vy" links={primaryLinks} />
               <NavSection title="Detaljer" links={secondaryLinks} />
             </div>
 
             <div className="mt-auto space-y-3 rounded-[1.6rem] border border-white/45 bg-white/45 p-4">
               <div>
-                <p className="truncate text-[0.98rem] font-medium tracking-[-0.015em] text-foreground">
+                <p className="truncate text-[0.95rem] font-medium tracking-[-0.015em] text-foreground">
                   {displayName}
                 </p>
-                <p className="text-[0.95rem] leading-6 text-muted-foreground">
+                <p className="text-[0.88rem] leading-6 text-muted-foreground">
                   Kontinuitet slår intensitet.
                 </p>
               </div>

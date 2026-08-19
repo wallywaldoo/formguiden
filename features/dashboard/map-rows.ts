@@ -5,10 +5,22 @@ import type {
   HealthPoint,
 } from "@/lib/analytics/types";
 
+function toTimestampString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  return String(value ?? "");
+}
+
+function toDateString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value ?? "");
+}
+
 export function mapActivityRow(row: {
   id: string;
   activity_type: string;
-  started_at: string;
+  started_at: string | Date;
   duration_s: number | null;
   distance_m: unknown;
   avg_pace_s_per_km: unknown;
@@ -17,7 +29,7 @@ export function mapActivityRow(row: {
   return {
     id: row.id,
     activityType: row.activity_type,
-    startedAt: row.started_at,
+    startedAt: toTimestampString(row.started_at),
     durationS: row.duration_s,
     distanceM: toFiniteNumber(row.distance_m),
     avgPaceSPerKm: toFiniteNumber(row.avg_pace_s_per_km),
@@ -26,9 +38,9 @@ export function mapActivityRow(row: {
 }
 
 export function mapHealthRow(row: {
-  local_date: string;
+  local_date: string | Date;
   sleep_duration_s: number | null;
-  sleep_start_at: string | null;
+  sleep_start_at: string | Date | null;
   hrv_rmssd_ms: unknown;
   resting_heart_rate_bpm: unknown;
   steps: number | null;
@@ -37,9 +49,11 @@ export function mapHealthRow(row: {
   body_battery_low: unknown;
 }): HealthPoint {
   return {
-    localDate: row.local_date,
+    localDate: toDateString(row.local_date),
     sleepDurationS: row.sleep_duration_s,
-    sleepStartAt: row.sleep_start_at,
+    sleepStartAt: row.sleep_start_at
+      ? toTimestampString(row.sleep_start_at)
+      : null,
     hrvRmssdMs: toFiniteNumber(row.hrv_rmssd_ms),
     restingHeartRateBpm: toFiniteNumber(row.resting_heart_rate_bpm),
     steps: row.steps,
@@ -50,12 +64,12 @@ export function mapHealthRow(row: {
 }
 
 export function mapBodyRow(row: {
-  measured_at: string;
+  measured_at: string | Date;
   mass_kg: unknown;
   body_fat_pct: unknown;
 }): BodyPoint {
   return {
-    measuredAt: row.measured_at,
+    measuredAt: toTimestampString(row.measured_at),
     massKg: toFiniteNumber(row.mass_kg),
     bodyFatPct: toFiniteNumber(row.body_fat_pct),
   };

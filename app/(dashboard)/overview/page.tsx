@@ -29,13 +29,14 @@ import { QuickLogActions } from "@/features/logging/quick-log-actions";
 import { RecommendationCard } from "@/features/recommendations/recommendation-card";
 import { ensureFreshRecommendation } from "@/features/recommendations/service";
 import { CatchUpHero } from "@/features/sync/catch-up-hero";
+import { GarminSyncPanel } from "@/features/sync/garmin-sync-panel";
 import { isNutritionAiEnabled } from "@/lib/ai/nutrition/create-estimator";
 import { computeDashboard } from "@/lib/analytics/dashboard";
 import { toDatetimeLocal } from "@/lib/analytics/dates";
 import { dailyDistanceSeries } from "@/lib/analytics/running";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { getDashboardData } from "@/lib/db/queries";
+import { getDashboardData, getGarminIntegrationStatus } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import {
   formatDistanceKm,
@@ -122,6 +123,124 @@ export default async function OverviewPage() {
   });
   const distanceUnit = preferences?.distance_unit === "mi" ? "mi" : "km";
   const targetPace = context.goal.targetPaceSPerKm;
+  let garminIntegration = null;
+  try {
+    garminIntegration = await getGarminIntegrationStatus();
+  } catch {
+    garminIntegration = null;
+  }
+  const garminMetadata =
+    garminIntegration?.metadata &&
+    typeof garminIntegration.metadata === "object" &&
+    !Array.isArray(garminIntegration.metadata)
+      ? garminIntegration.metadata
+      : null;
+  const garminLastResult =
+    garminMetadata?.lastResult &&
+    typeof garminMetadata.lastResult === "object" &&
+    !Array.isArray(garminMetadata.lastResult)
+      ? (garminMetadata.lastResult as Record<string, unknown>)
+      : null;
+  const garminStatus: {
+    connected: boolean;
+    lastSyncAt: string | null;
+    lastSuccessAt: string | null;
+    lastError: string | null;
+    lastTrigger: "manual" | "auto" | null;
+    lastResult: {
+      days: number;
+      activitiesUpserted: number;
+      healthDaysUpserted: number;
+      weightEntriesUpserted: number;
+      errors: number;
+    } | null;
+    fullSync: {
+      totalDays: number;
+      completedDays: number;
+      chunkDays: number;
+      lastChunkStart?: string;
+      lastChunkEnd?: string;
+      done: boolean;
+    } | null;
+  } = {
+    connected:
+      Boolean(process.env.GARMIN_SESSION) || garminIntegration?.status === "active",
+    lastSyncAt:
+      typeof garminMetadata?.lastSyncAt === "string"
+        ? garminMetadata.lastSyncAt
+        : null,
+    lastSuccessAt:
+      typeof garminMetadata?.lastSuccessAt === "string"
+        ? garminMetadata.lastSuccessAt
+        : null,
+    lastError:
+      typeof garminMetadata?.lastError === "string"
+        ? garminMetadata.lastError
+        : null,
+    lastTrigger:
+      garminMetadata?.lastTrigger === "manual" || garminMetadata?.lastTrigger === "auto"
+        ? garminMetadata.lastTrigger
+        : null,
+    lastResult:
+      garminLastResult
+        ? {
+            days: typeof garminLastResult.days === "number" ? garminLastResult.days : 14,
+            activitiesUpserted:
+              typeof garminLastResult.activitiesUpserted === "number"
+                ? garminLastResult.activitiesUpserted
+                : 0,
+            healthDaysUpserted:
+              typeof garminLastResult.healthDaysUpserted === "number"
+                ? garminLastResult.healthDaysUpserted
+                : 0,
+            weightEntriesUpserted:
+              typeof garminLastResult.weightEntriesUpserted === "number"
+                ? garminLastResult.weightEntriesUpserted
+                : 0,
+            errors:
+              typeof garminLastResult.errors === "number"
+                ? garminLastResult.errors
+                : 0,
+          }
+        : null,
+    fullSync:
+      garminMetadata?.fullSync &&
+      typeof garminMetadata.fullSync === "object" &&
+      !Array.isArray(garminMetadata.fullSync)
+        ? {
+            totalDays:
+              typeof (garminMetadata.fullSync as Record<string, unknown>).totalDays ===
+              "number"
+                ? ((garminMetadata.fullSync as Record<string, unknown>).totalDays as number)
+                : 3650,
+            completedDays:
+              typeof (garminMetadata.fullSync as Record<string, unknown>).completedDays ===
+              "number"
+                ? ((garminMetadata.fullSync as Record<string, unknown>)
+                    .completedDays as number)
+                : 0,
+            chunkDays:
+              typeof (garminMetadata.fullSync as Record<string, unknown>).chunkDays ===
+              "number"
+                ? ((garminMetadata.fullSync as Record<string, unknown>).chunkDays as number)
+                : 30,
+            lastChunkStart:
+              typeof (garminMetadata.fullSync as Record<string, unknown>)
+                .lastChunkStart === "string"
+                ? ((garminMetadata.fullSync as Record<string, unknown>)
+                    .lastChunkStart as string)
+                : undefined,
+            lastChunkEnd:
+              typeof (garminMetadata.fullSync as Record<string, unknown>)
+                .lastChunkEnd === "string"
+                ? ((garminMetadata.fullSync as Record<string, unknown>)
+                    .lastChunkEnd as string)
+                : undefined,
+            done:
+              (garminMetadata.fullSync as Record<string, unknown>).done === true,
+          }
+        : null,
+  };
   const headlineMetrics = [
     {
       label: "Vecka",
@@ -153,27 +272,19 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,0.95fr)]">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(21rem,0.9fr)]">
         <Card className="glass-panel ambient-divider overflow-hidden border-white/50">
           <CardContent className="p-0">
-            <div className="grid gap-8 p-5 md:p-7">
+            <div className="grid gap-6 p-5 md:p-7">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-3">
-                  <Badge
-                    variant="secondary"
-                    className="border-white/50 bg-white/70 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.14em] uppercase"
-                  >
-                    Dagens överblick
-                  </Badge>
-                  <div className="space-y-2">
-                    <h1 className="text-[2.45rem] font-semibold tracking-[-0.05em] text-balance md:text-[3.05rem]">
-                      Översikt först. Nästa steg tydligt.
-                    </h1>
-                    <p className="max-w-2xl text-[0.98rem] leading-7 text-muted-foreground md:text-[1.04rem]">
-                      Formkurvan samlar veckan, återhämtningen och vad du bör
-                      göra härnäst i en vy som går att läsa på några sekunder.
-                    </p>
-                  </div>
+                <div className="max-w-2xl space-y-2">
+                  <h1 className="text-[2rem] font-semibold tracking-[-0.035em] text-balance md:text-[2.45rem]">
+                    Översikt först. Nästa steg tydligt.
+                  </h1>
+                  <p className="text-[0.95rem] leading-7 text-muted-foreground md:max-w-xl">
+                    Veckoläge, återhämtning och nästa rekommenderade handling i
+                    en lugn vy som går att skanna snabbt.
+                  </p>
                 </div>
                 <Button
                   asChild
@@ -187,26 +298,26 @@ export default async function OverviewPage() {
                 </Button>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(16rem,0.9fr)]">
-                <div className="rounded-[1.8rem] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(242,246,255,0.72))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_16px_40px_rgba(77,95,135,0.12)] md:p-6">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.95fr)]">
+                <div className="rounded-[1.6rem] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(242,246,255,0.72))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_16px_40px_rgba(77,95,135,0.12)]">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
-                      <p className="text-[0.95rem] font-medium tracking-[-0.01em] text-muted-foreground">
+                      <p className="text-[0.9rem] font-medium tracking-[-0.01em] text-muted-foreground">
                         Nästa steg
                       </p>
-                      <h2 className="max-w-xl text-[2rem] font-semibold tracking-[-0.045em] md:text-[2.35rem]">
+                      <h2 className="max-w-lg text-[1.6rem] font-semibold tracking-[-0.03em] md:text-[1.9rem]">
                         {dashboard.action.label}
                       </h2>
                     </div>
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Sparkles className="size-5" />
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Sparkles className="size-4.5" />
                     </span>
                   </div>
-                  <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-muted-foreground md:text-[1.02rem]">
+                  <p className="mt-3 max-w-2xl text-[0.95rem] leading-7 text-muted-foreground">
                     {dashboard.action.reason}
                   </p>
-                  <div className="mt-6 flex flex-wrap items-center gap-3">
-                    <Button asChild size="lg" className="shadow-none">
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <Button asChild className="shadow-none">
                       <Link href={dashboard.action.href}>
                         Gå till nästa steg
                       </Link>
@@ -214,7 +325,6 @@ export default async function OverviewPage() {
                     <Button
                       asChild
                       variant="outline"
-                      size="lg"
                       className="border-white/55 bg-white/58 shadow-none"
                     >
                       <Link href="/import">Lägg in nytt pass</Link>
@@ -226,15 +336,15 @@ export default async function OverviewPage() {
                   {headlineMetrics.map((metric) => (
                     <div
                       key={metric.label}
-                      className="glass-panel-soft ambient-divider rounded-[1.6rem] border p-4"
+                      className="glass-panel-soft ambient-divider rounded-[1.4rem] border p-4"
                     >
-                      <p className="text-[0.94rem] font-medium tracking-[-0.01em] text-muted-foreground">
+                      <p className="text-[0.88rem] font-medium tracking-[-0.01em] text-muted-foreground">
                         {metric.label}
                       </p>
-                      <p className="mt-3 text-[1.85rem] font-semibold tracking-[-0.04em]">
+                      <p className="mt-2.5 text-[1.55rem] font-semibold tracking-[-0.03em]">
                         {metric.value}
                       </p>
-                      <p className="mt-2 text-[0.94rem] leading-6 text-muted-foreground">
+                      <p className="mt-1.5 text-[0.88rem] leading-6 text-muted-foreground">
                         {metric.detail}
                       </p>
                     </div>
@@ -246,15 +356,17 @@ export default async function OverviewPage() {
         </Card>
 
         <div className="grid gap-4">
+          <GarminSyncPanel initialStatus={garminStatus} />
+
           <Card className="glass-panel ambient-divider border-white/50">
-            <CardHeader className="gap-3">
+            <CardHeader className="gap-3 pb-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <MessageCircleHeart className="size-5" />
                   </span>
                   <div>
-                    <CardTitle className="text-xl">Coach i flödet</CardTitle>
+                    <CardTitle className="text-[1.05rem]">Coach i flödet</CardTitle>
                     <CardDescription>
                       Fråga direkt när översikten väcker en följdfråga.
                     </CardDescription>
@@ -262,8 +374,8 @@ export default async function OverviewPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-[0.96rem] leading-7 text-muted-foreground">
+            <CardContent className="space-y-4 pt-0">
+              <p className="text-[0.92rem] leading-6 text-muted-foreground">
                 {recommendation
                   ? `Just nu pekar rekommendationen mot “${recommendation.actionSv}”. Öppna Coach för att få resonemanget i dialogform.`
                   : "Coach använder samma tränings- och återhämtningsbild som översikten, men låter dig ställa en egen fråga direkt."}
@@ -275,8 +387,8 @@ export default async function OverviewPage() {
           </Card>
 
           <Card className="glass-panel ambient-divider border-white/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-[1.05rem]">
                 <CalendarClock className="size-5 text-primary" />
                 Snabblogga
               </CardTitle>
@@ -284,7 +396,7 @@ export default async function OverviewPage() {
                 Mat, vätska, vikt och styrka utan att lämna översikten.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <QuickLogActions
                 timeZone={context.timeZone}
                 nowLocal={toDatetimeLocal(now.toISOString(), context.timeZone)}

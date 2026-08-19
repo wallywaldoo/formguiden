@@ -38,6 +38,8 @@ function mapActivityType(typeKey: string): string {
 export interface SyncResult {
   syncedAt: string;
   days: number;
+  startDate: string;
+  endDate: string;
   healthDaysUpserted: number;
   weightEntriesUpserted: number;
   activitiesUpserted: number;
@@ -46,15 +48,19 @@ export interface SyncResult {
 
 export async function runGarminSync(options: {
   days?: number;
+  startDate?: string;
+  endDate?: string;
 }): Promise<SyncResult> {
   const days = options.days ?? 14;
   const errors: string[] = [];
 
   const client = GarminClient.fromEnv();
 
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - (days - 1));
+  const endDate = options.endDate ? new Date(options.endDate) : new Date();
+  const startDate = options.startDate ? new Date(options.startDate) : new Date();
+  if (!options.startDate) {
+    startDate.setDate(endDate.getDate() - (days - 1));
+  }
 
   const endStr = endDate.toISOString().split("T")[0];
   const startStr = startDate.toISOString().split("T")[0];
@@ -218,6 +224,8 @@ export async function runGarminSync(options: {
   return {
     syncedAt: new Date().toISOString(),
     days,
+    startDate: startStr,
+    endDate: endStr,
     healthDaysUpserted,
     weightEntriesUpserted,
     activitiesUpserted,

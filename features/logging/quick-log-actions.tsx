@@ -34,10 +34,10 @@ export function QuickLogActions({
   const [weightOpen, setWeightOpen] = useState(false);
 
   return (
-    <div className="flex flex-wrap gap-2.5">
+    <div className="grid grid-cols-2 gap-2.5">
       <Dialog open={foodOpen} onOpenChange={setFoodOpen}>
         <DialogTrigger asChild>
-          <Button className="shadow-none">Logga mat</Button>
+          <Button className="w-full justify-center shadow-none">Logga mat</Button>
         </DialogTrigger>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -58,7 +58,7 @@ export function QuickLogActions({
 
       <Dialog open={hydrationOpen} onOpenChange={setHydrationOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="shadow-none">
+          <Button variant="outline" className="w-full justify-center shadow-none">
             Logga vätska
           </Button>
         </DialogTrigger>
@@ -78,7 +78,7 @@ export function QuickLogActions({
 
       <Dialog open={weightOpen} onOpenChange={setWeightOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="shadow-none">
+          <Button variant="outline" className="w-full justify-center shadow-none">
             Logga vikt
           </Button>
         </DialogTrigger>
@@ -98,7 +98,11 @@ export function QuickLogActions({
         </DialogContent>
       </Dialog>
 
-      <Button variant="outline" asChild className="shadow-none">
+      <Button
+        variant="outline"
+        asChild
+        className="w-full justify-center shadow-none"
+      >
         <Link href="/strength">Logga styrka</Link>
       </Button>
     </div>
