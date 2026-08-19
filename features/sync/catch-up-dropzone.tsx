@@ -87,11 +87,11 @@ export function CatchUpDropzone({
           void ingest(filesFromList(event.dataTransfer.files));
         }}
         className={cn(
-          "flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center transition-colors",
+          "flex flex-col items-center justify-center rounded-[1.75rem] border border-dashed px-6 text-center transition-colors",
           variant === "full" ? "min-h-56 gap-3 py-12" : "min-h-28 gap-2 py-6",
           hover || busy
-            ? "border-foreground bg-muted/70"
-            : "border-border bg-muted/30",
+            ? "border-primary/50 bg-white/82"
+            : "border-white/55 bg-white/52",
         )}
         data-catch-up-dropzone="true"
       >

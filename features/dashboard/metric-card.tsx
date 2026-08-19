@@ -26,10 +26,12 @@ export function MetricCard({
   className?: string;
 }) {
   return (
-    <Card className={cn(className)}>
-      <CardHeader>
-        <CardDescription>{title}</CardDescription>
-        <CardTitle className="text-4xl font-semibold tracking-tight">
+    <Card className={cn("border-white/50", className)}>
+      <CardHeader className="gap-3">
+        <CardDescription className="text-sm font-medium">
+          {title}
+        </CardDescription>
+        <CardTitle className="text-[2rem] font-semibold tracking-tight md:text-[2.4rem]">
           {value}
         </CardTitle>
       </CardHeader>
@@ -37,11 +39,13 @@ export function MetricCard({
         <CardContent>
           <div className="flex items-start justify-between gap-3">
             {caption ? (
-              <p className="text-sm text-muted-foreground">{caption}</p>
+              <p className="text-sm leading-6 text-muted-foreground">
+                {caption}
+              </p>
             ) : null}
             {explanation ? (
               <Tooltip>
-                <TooltipTrigger className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+                <TooltipTrigger className="rounded-full border border-white/45 bg-white/55 px-2.5 py-1 text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground">
                   Formel
                 </TooltipTrigger>
                 <TooltipContent>{explanation}</TooltipContent>

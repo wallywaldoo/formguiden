@@ -1,4 +1,10 @@
 import Link from "next/link";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  MessageCircleHeart,
+  Sparkles,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,15 +103,180 @@ export default async function OverviewPage() {
   });
   const distanceUnit = preferences?.distance_unit === "mi" ? "mi" : "km";
   const targetPace = context.goal.targetPaceSPerKm;
+  const headlineMetrics = [
+    {
+      label: "Vecka",
+      value:
+        dashboard.weeklyDistance.value != null
+          ? formatDistanceKm(dashboard.weeklyDistance.value, distanceUnit)
+          : "—",
+      detail: context.goal.weeklyRunDistanceM
+        ? `Mål ${formatDistanceKm(context.goal.weeklyRunDistanceM, distanceUnit)}`
+        : "Inget veckomål",
+    },
+    {
+      label: "Sömn",
+      value:
+        dashboard.sleep.value != null
+          ? formatHours(dashboard.sleep.value)
+          : "—",
+      detail: `${Math.round(dashboard.sleep.completeness * 7)} av 7 nätter`,
+    },
+    {
+      label: "Datatäckning",
+      value:
+        dashboard.completeness.value != null
+          ? formatPercent(dashboard.completeness.value)
+          : "—",
+      detail: "Viktad överblick av signalerna",
+    },
+  ];
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Översikt</h1>
-        <p className="text-muted-foreground">
-          Ett primärt nästa steg. Saknade värden lämnas tomma.
-        </p>
-      </div>
+    <div className="space-y-6 md:space-y-8">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,0.95fr)]">
+        <Card className="glass-panel ambient-divider overflow-hidden border-white/50">
+          <CardContent className="p-0">
+            <div className="grid gap-8 p-5 md:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-3">
+                  <Badge
+                    variant="secondary"
+                    className="border-white/50 bg-white/70 px-3 py-1 text-[0.7rem] tracking-[0.18em] uppercase"
+                  >
+                    Dagens överblick
+                  </Badge>
+                  <div className="space-y-2">
+                    <h1 className="text-3xl font-semibold tracking-tight md:text-[2.6rem]">
+                      Översikt först. Nästa steg tydligt.
+                    </h1>
+                    <p className="max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                      Formkurvan samlar veckan, återhämtningen och vad du bör
+                      göra härnäst i en vy som går att läsa på några sekunder.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-white/55 bg-white/62 shadow-none"
+                >
+                  <Link href="/coach">
+                    Öppna Coach
+                    <ArrowUpRight className="size-4" />
+                  </Link>
+                </Button>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(16rem,0.9fr)]">
+                <div className="rounded-[1.8rem] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(242,246,255,0.72))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_16px_40px_rgba(77,95,135,0.12)] md:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Nästa steg
+                      </p>
+                      <h2 className="max-w-xl text-2xl font-semibold tracking-tight md:text-3xl">
+                        {dashboard.action.label}
+                      </h2>
+                    </div>
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Sparkles className="size-5" />
+                    </span>
+                  </div>
+                  <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                    {dashboard.action.reason}
+                  </p>
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    <Button asChild size="lg" className="shadow-none">
+                      <Link href={dashboard.action.href}>
+                        Gå till nästa steg
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="lg"
+                      className="border-white/55 bg-white/58 shadow-none"
+                    >
+                      <Link href="/import">Lägg in nytt pass</Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                  {headlineMetrics.map((metric) => (
+                    <div
+                      key={metric.label}
+                      className="glass-panel-soft ambient-divider rounded-[1.6rem] border p-4"
+                    >
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {metric.label}
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold tracking-tight">
+                        {metric.value}
+                      </p>
+                      <p className="mt-2 text-sm leading-5 text-muted-foreground">
+                        {metric.detail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4">
+          <Card className="glass-panel ambient-divider border-white/50">
+            <CardHeader className="gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <MessageCircleHeart className="size-5" />
+                  </span>
+                  <div>
+                    <CardTitle className="text-xl">Coach i flödet</CardTitle>
+                    <CardDescription>
+                      Fråga direkt när översikten väcker en följdfråga.
+                    </CardDescription>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm leading-6 text-muted-foreground">
+                {recommendation
+                  ? `Just nu pekar rekommendationen mot “${recommendation.actionSv}”. Öppna Coach för att få resonemanget i dialogform.`
+                  : "Coach använder samma tränings- och återhämtningsbild som översikten, men låter dig ställa en egen fråga direkt."}
+              </p>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/coach">Fråga Coach</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-panel ambient-divider border-white/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <CalendarClock className="size-5 text-primary" />
+                Snabblogga
+              </CardTitle>
+              <CardDescription>
+                Mat, vätska, vikt och styrka utan att lämna översikten.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <QuickLogActions
+                timeZone={context.timeZone}
+                nowLocal={toDatetimeLocal(now.toISOString(), context.timeZone)}
+                massUnit={preferences?.mass_unit === "lb" ? "lb" : "kg"}
+                volumeUnit={preferences?.volume_unit === "floz" ? "floz" : "ml"}
+                aiEnabled={isNutritionAiEnabled()}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <CatchUpHero
         lastActivityAt={activities[0]?.startedAt ?? null}
@@ -113,59 +284,7 @@ export default async function OverviewPage() {
         timeZone={context.timeZone}
       />
 
-      {recommendation ? (
-        <RecommendationCard recommendation={recommendation} />
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardDescription>Nästa steg</CardDescription>
-          <CardTitle className="text-2xl">{dashboard.action.label}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {dashboard.action.reason}
-          </p>
-          <Button asChild>
-            <Link href={dashboard.action.href}>{dashboard.action.label}</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Logga</CardTitle>
-          <CardDescription>
-            Mat, vätska, vikt och styrka — snabbloggning utan att lämna
-            översikten.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <QuickLogActions
-            timeZone={context.timeZone}
-            nowLocal={toDatetimeLocal(now.toISOString(), context.timeZone)}
-            massUnit={preferences?.mass_unit === "lb" ? "lb" : "kg"}
-            volumeUnit={preferences?.volume_unit === "floz" ? "floz" : "ml"}
-            aiEnabled={isNutritionAiEnabled()}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          title="Vecka"
-          value={
-            dashboard.weeklyDistance.value != null
-              ? formatDistanceKm(dashboard.weeklyDistance.value, distanceUnit)
-              : "—"
-          }
-          caption={
-            context.goal.weeklyRunDistanceM
-              ? `Mål ${formatDistanceKm(context.goal.weeklyRunDistanceM, distanceUnit)}`
-              : "Inget veckomål"
-          }
-          explanation="Summa distans för löpning/trail/löpband i innevarande ISO-vecka. Pass utan distans räknas inte in."
-        />
+      <div className="grid gap-4 lg:grid-cols-3">
         <MetricCard
           title="Måltempo"
           value={targetPace ? `${formatPaceMinPerKm(targetPace)} /km` : "—"}
@@ -175,29 +294,6 @@ export default async function OverviewPage() {
               : "Inget representativt pass"
           }
           explanation="Senaste löppass ≥ 5 km (annars senaste med tempo) minus måltempo, i sekunder per kilometer."
-        />
-        <MetricCard
-          title="Datatäckning"
-          value={
-            dashboard.completeness.value != null
-              ? formatPercent(dashboard.completeness.value)
-              : "—"
-          }
-          caption="Viktad andel av förväntade serier"
-          explanation="Löpvecka och tempo väger tyngst, därefter sömn, HRV, vilopuls och vikt."
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          title="Sömn 7 dagar"
-          value={
-            dashboard.sleep.value != null
-              ? formatHours(dashboard.sleep.value)
-              : "—"
-          }
-          caption={`${Math.round(dashboard.sleep.completeness * 7)} av 7 nätter`}
-          explanation="Medel av nätter med sleep_duration_s. Tomma nätter exkluderas."
         />
         <MetricCard
           title="HRV-baslinje"
@@ -225,60 +321,74 @@ export default async function OverviewPage() {
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Löptrend</CardTitle>
-          <CardDescription>
-            7 / 28 / 90 dagar. Tomma dagar är noll, inte påhittad data.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {activities.length === 0 ? (
-            <DataEmptyState
-              title="Ingen löpning ännu"
-              description="Exportera Original/FIT från Garmin Connect och släpp filen här."
-            />
-          ) : (
-            <DistanceRangeChart
-              series={{
-                "7": dailyDistanceSeries(activities, context, 7),
-                "28": dailyDistanceSeries(activities, context, 28),
-                "90": dailyDistanceSeries(activities, context, 90),
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.9fr)]">
+        <Card className="glass-panel ambient-divider border-white/50">
+          <CardHeader>
+            <CardTitle>Löptrend</CardTitle>
+            <CardDescription>
+              7 / 28 / 90 dagar. Tomma dagar är noll, inte påhittad data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {activities.length === 0 ? (
+              <DataEmptyState
+                title="Ingen löpning ännu"
+                description="Exportera Original/FIT från Garmin Connect och släpp filen här."
+              />
+            ) : (
+              <DistanceRangeChart
+                series={{
+                  "7": dailyDistanceSeries(activities, context, 7),
+                  "28": dailyDistanceSeries(activities, context, 28),
+                  "90": dailyDistanceSeries(activities, context, 90),
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Senaste inhämtningar</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {data.data_imports.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Inga inhämtningar ännu.
-            </p>
-          ) : (
-            data.data_imports.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-3"
-              >
-                <Link
-                  href={`/import/${item.id}`}
-                  className="text-sm underline-offset-4 hover:underline"
-                >
-                  {new Date(item.created_at).toLocaleString("sv-SE")}
-                </Link>
-                <Badge variant="secondary">
-                  {IMPORT_STATUS_LABEL[item.status] ?? item.status}
-                </Badge>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+        <div className="grid gap-4">
+          {recommendation ? (
+            <RecommendationCard recommendation={recommendation} />
+          ) : null}
+
+          <Card className="glass-panel ambient-divider border-white/50">
+            <CardHeader>
+              <CardTitle>Senaste inhämtningar</CardTitle>
+              <CardDescription>
+                Håll koll på vad som precis kommit in i dagsbilden.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {data.data_imports.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Inga inhämtningar ännu.
+                </p>
+              ) : (
+                data.data_imports.map((item) => (
+                  <div
+                    key={item.id}
+                    className="glass-panel-soft ambient-divider flex items-center justify-between gap-3 rounded-2xl border px-4 py-3"
+                  >
+                    <Link
+                      href={`/import/${item.id}`}
+                      className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      {new Date(item.created_at).toLocaleString("sv-SE")}
+                    </Link>
+                    <Badge
+                      variant="secondary"
+                      className="border-white/50 bg-white/70"
+                    >
+                      {IMPORT_STATUS_LABEL[item.status] ?? item.status}
+                    </Badge>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

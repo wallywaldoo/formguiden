@@ -48,10 +48,12 @@ export function RecommendationCard({
   const formulas = formulaLabels(recommendation.formulaKeys);
 
   return (
-    <Card>
+    <Card className="border-white/50">
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardDescription>Rekommendation</CardDescription>
+          <CardDescription className="font-medium">
+            Rekommendation
+          </CardDescription>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">
               {CONFIDENCE_LABELS[recommendation.confidence] ??
@@ -60,10 +62,12 @@ export function RecommendationCard({
             {showRefresh ? <RefreshRecommendationButton /> : null}
           </div>
         </div>
-        <CardTitle className="text-2xl">{recommendation.actionSv}</CardTitle>
+        <CardTitle className="text-2xl tracking-tight">
+          {recommendation.actionSv}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm leading-6 text-muted-foreground">
           Jämförelseperiod: {recommendation.comparisonPeriodDays} dagar.
           Datatäckning: {formatPercent(recommendation.completeness)}. Giltig
           till{" "}
@@ -78,7 +82,7 @@ export function RecommendationCard({
             {recommendation.signals.map((signal) => (
               <li
                 key={signal.signalKey}
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-md border px-3 py-2"
+                className="glass-panel-soft ambient-divider flex flex-wrap items-baseline justify-between gap-2 rounded-2xl border px-3.5 py-3"
               >
                 <span className="text-muted-foreground">
                   {SIGNAL_LABELS[signal.signalKey] ?? signal.signalKey}
@@ -98,7 +102,7 @@ export function RecommendationCard({
           {disclaimerText(recommendation.disclaimerKey)}
         </p>
 
-        <details className="rounded-md border px-3 py-2 text-sm">
+        <details className="glass-panel-soft ambient-divider rounded-2xl border px-4 py-3 text-sm">
           <summary className="cursor-pointer font-medium">Varför?</summary>
           <div className="mt-3 space-y-2 text-muted-foreground">
             <p>

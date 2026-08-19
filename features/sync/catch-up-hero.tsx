@@ -20,16 +20,16 @@ export function CatchUpHero({
     : null;
 
   return (
-    <section className="overflow-hidden rounded-3xl border bg-card">
-      <div className="grid gap-8 p-6 md:grid-cols-[1.1fr_0.9fr] md:p-8">
+    <section className="glass-panel ambient-divider overflow-hidden rounded-[2rem] border border-white/50">
+      <div className="grid gap-8 p-5 md:grid-cols-[1.15fr_0.85fr] md:p-8">
         <div className="space-y-4">
-          <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
+          <p className="text-sm font-medium text-muted-foreground">
             Efter passet
           </p>
           <h2 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
             {status.headline}
           </h2>
-          <p className="max-w-lg text-muted-foreground text-pretty">
+          <p className="max-w-lg leading-7 text-muted-foreground text-pretty">
             {status.body}
           </p>
           <p className="text-sm text-muted-foreground">
