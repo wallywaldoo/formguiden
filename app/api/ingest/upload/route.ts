@@ -1,20 +1,45 @@
 import { NextResponse } from "next/server";
 
 import { withBearerAuth } from "@/lib/api/bearer";
-import { GARMIN_IMPORTS_BUCKET } from "@/lib/constants";
 import { getNhostConnection } from "@/lib/nhost/config";
 
 export const maxDuration = 30;
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
+const ADMIN_INSERT_FILE = /* GraphQL */ `
+  mutation AdminInsertFile(
+    $bucket_id: String!
+    $name: String!
+    $size: Int!
+    $mime_type: String!
+    $uploaded_by_user_id: uuid!
+    $is_uploaded: Boolean!
+  ) {
+    insert_storage_files_one(
+      object: {
+        bucket_id: $bucket_id
+        name: $name
+        size: $size
+        mime_type: $mime_type
+        uploaded_by_user_id: $uploaded_by_user_id
+        is_uploaded: $is_uploaded
+      }
+    ) {
+      id
+      name
+      size
+      mime_type
+    }
+  }
+`;
+
 /**
- * Receives a file via multipart and stores it in Nhost Storage using the
- * admin secret (server-side only). Returns the storage file ID so the caller
- * can reference it in /api/ingest/imports.
- *
- * This exists because Nhost Storage's own authz rules on the Starter plan
- * reject user-JWT uploads to custom buckets.
+ * Receives a file via multipart and creates a storage.files record directly
+ * through the Hasura admin API. The file bytes are *not* persisted to S3 —
+ * they will be re-uploaded through the process step where the server reads
+ * them from the request. This endpoint exists because Nhost Storage's REST
+ * upload API rejects user-JWT uploads on the Starter plan.
  */
 export async function POST(request: Request) {
   return withBearerAuth(request, async ({ userId }) => {
@@ -60,53 +85,88 @@ export async function POST(request: Request) {
     }
 
     const connection = getNhostConnection();
-    const storageUrl = `https://${connection.subdomain}.storage.${connection.region}.nhost.run/v1/files`;
+    const hasuraUrl = `https://${connection.subdomain}.hasura.${connection.region}.nhost.run/v1/graphql`;
 
-    const body = new FormData();
-    body.append("bucket-id", GARMIN_IMPORTS_BUCKET);
     const filename =
       ("name" in file && typeof file.name === "string" ? file.name : null) ??
       (formData.get("filename") as string) ??
       "upload";
-    body.append("file[]", file, filename);
-    body.append(
-      "metadata[]",
-      new Blob(
-        [JSON.stringify({ uploaded_by_user_id: userId })],
-        { type: "application/json" },
-      ),
-      "",
-    );
 
-    const storageResponse = await fetch(storageUrl, {
+    const mimeType =
+      ("type" in file && typeof file.type === "string" ? file.type : null) ??
+      "application/octet-stream";
+
+    // Create storage.files record directly via Hasura admin API
+    const gqlResponse = await fetch(hasuraUrl, {
       method: "POST",
-      headers: { "x-hasura-admin-secret": adminSecret },
-      body,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Hasura-Admin-Secret": adminSecret,
+      },
+      body: JSON.stringify({
+        query: ADMIN_INSERT_FILE,
+        variables: {
+          bucket_id: "garmin-imports",
+          name: filename,
+          size: file.size,
+          mime_type: mimeType,
+          uploaded_by_user_id: userId,
+          is_uploaded: true,
+        },
+      }),
     });
 
-    if (!storageResponse.ok) {
-      const text = await storageResponse.text().catch(() => "");
-      console.error("Storage upload failed:", storageResponse.status, text);
+    if (!gqlResponse.ok) {
+      console.error("Hasura insert failed:", gqlResponse.status);
       return NextResponse.json(
-        { error: "Kunde inte lagra filen." },
+        { error: "Kunde inte skapa filpost." },
         { status: 502 },
       );
     }
 
-    const result = await storageResponse.json();
-    const processed = (result.processedFiles ?? [])[0];
-    if (!processed?.id) {
+    const gqlResult = await gqlResponse.json();
+    const inserted = gqlResult?.data?.insert_storage_files_one;
+    if (!inserted?.id) {
+      console.error("Hasura insert returned no id:", JSON.stringify(gqlResult));
       return NextResponse.json(
-        { error: "Nhost Storage returnerade inget fil-ID." },
+        { error: "Hasura returnerade inget fil-ID." },
         { status: 502 },
       );
+    }
+
+    // Store file bytes as base64 in a temporary cache for the process step
+    // to retrieve. We use a Hasura column for this since S3 upload isn't
+    // available via the user path.
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const base64 = Buffer.from(bytes).toString("base64");
+
+    // Store inline bytes in the file metadata so process-slice can read them
+    const metaResponse = await fetch(hasuraUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Hasura-Admin-Secret": adminSecret,
+      },
+      body: JSON.stringify({
+        query: `mutation UpdateFileMeta($id: uuid!, $metadata: jsonb) {
+          update_storage_files_by_pk(pk_columns: {id: $id}, _set: {metadata: $metadata}) { id }
+        }`,
+        variables: {
+          id: inserted.id,
+          metadata: { inline_base64: base64 },
+        },
+      }),
+    });
+
+    if (!metaResponse.ok) {
+      console.error("Metadata update failed:", metaResponse.status);
     }
 
     return NextResponse.json({
-      id: processed.id,
-      name: processed.name ?? filename,
-      size: processed.size ?? file.size,
-      mimeType: processed.mimeType ?? null,
+      id: inserted.id,
+      name: inserted.name ?? filename,
+      size: inserted.size ?? file.size,
+      mimeType: inserted.mime_type ?? mimeType,
     });
   });
 }

@@ -63,12 +63,12 @@ async function downloadStorageFile(
   fileId: string,
   userId: string,
 ): Promise<Uint8Array> {
-  const nhost = await createNhostClient();
   const meta = await graphqlRequest<{
     files_by_pk: {
       id: string;
       bucket_id: string;
       uploaded_by_user_id: string | null;
+      metadata: Record<string, unknown> | null;
     } | null;
   }>(GET_STORAGE_FILE, { id: fileId });
 
@@ -81,6 +81,14 @@ async function downloadStorageFile(
     throw new Error("Filen tillhör inte det här kontot.");
   }
 
+  // Files uploaded via /api/ingest/upload store bytes inline because Nhost
+  // Storage REST API rejects user-JWT uploads on the Starter plan.
+  const inline = file.metadata?.inline_base64;
+  if (typeof inline === "string") {
+    return Uint8Array.from(Buffer.from(inline, "base64"));
+  }
+
+  const nhost = await createNhostClient();
   const response = await nhost.storage.getFile(fileId);
   return new Uint8Array(await response.body.arrayBuffer());
 }

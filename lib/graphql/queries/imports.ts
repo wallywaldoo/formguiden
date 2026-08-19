@@ -7,6 +7,7 @@ export const GET_STORAGE_FILE = /* GraphQL */ `
       size
       mime_type
       uploaded_by_user_id
+      metadata
     }
   }
 `;
