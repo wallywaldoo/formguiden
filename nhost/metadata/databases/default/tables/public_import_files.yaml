@@ -58,6 +58,7 @@ update_permissions:
         - error_message
         - parent_file_id
         - zip_entry_path
+        - source_provenance
       filter:
         user_id:
           _eq: X-Hasura-User-Id

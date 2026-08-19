@@ -85,6 +85,14 @@ The cookie value is a JSON `StoredSession` (access token + refresh token materia
 5. Do not log cookies, `Authorization` headers, or pre-signed URLs.
 6. Document this trade-off in the Phase 1 security notes again if Nhost adds an HttpOnly-first recipe.
 
+## 3a. Personal access tokens for the local runner
+
+Nhost PATs grant the **whole account**, not an import-only scope. Formkurvan stores only the token id, label, and expiry — never the secret. The secret is shown once in settings.
+
+Bearer requests hit `/api/ingest/*`, which is excluded from the cookie proxy. The PAT is exchanged for a user session; Hasura row permissions still apply. A stolen PAT is full-account compromise until it expires. Garmin credentials are still forbidden: the runner holds those locally.
+
+Sources: Nhost `createPAT` / `signInPAT`.
+
 ## 4. Roles
 
 | Role                          | Use                                                                                                                         |

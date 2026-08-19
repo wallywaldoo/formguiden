@@ -74,7 +74,7 @@ lib/import/
 
 `ImportProviderAdapter`:
 
-- `id: "garmin-file" | "garmin-api" | "garmindb"`
+- `id: "garmin-file" | "garmin-api" | "garmindb" | "garmin-connect"`
 - `detect(bytes): FileKind | null`
 - `parse(bytes, context): ParseResult` (canonical records + warnings)
 - `externalId(record): string | null`
@@ -91,6 +91,7 @@ The Garmin API adapter exists only as a typed stub and is not wired to any UI. T
 | CSV    | Text after ZIP/XML/FIT rejected; header sniff | Summaries                            | activities or body/health if columns match |
 | ZIP    | `PK` magic                                    | Nested supported files               | Recurse with limits                        |
 | SQLite | `SQLite format 3\0` + GarminDB fingerprint    | GarminDB `garmin.db` only            | daily health, body measurements — Phase 6  |
+| JSON   | Top-level `{` after credential scan           | Local `python-garminconnect` runner  | daily health, body measurements — Phase 7  |
 
 FIT parsing library: official **`@garmin/fitsdk` 21.213.0** (Garmin FIT Protocol License; internal product use). Pure JavaScript, no native addons.
 

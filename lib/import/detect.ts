@@ -5,6 +5,7 @@ export const FILE_KINDS = [
   "csv",
   "zip",
   "sqlite",
+  "json",
   "unknown",
 ] as const;
 
@@ -62,6 +63,12 @@ export function detectFileKind(bytes: Uint8Array): FileKind {
     if (lower.includes("<gpx") || lower.includes("://www.topografix.com/gpx")) {
       return "gpx";
     }
+  }
+
+  // Only a top-level object counts. Garmin's own exports are arrays or CSV, so
+  // this stays narrow enough not to swallow them.
+  if (sample.startsWith("{")) {
+    return "json";
   }
 
   if (looksLikeCsv(sample)) {

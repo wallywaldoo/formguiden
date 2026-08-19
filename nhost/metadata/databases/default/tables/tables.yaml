@@ -26,3 +26,4 @@
 - "!include public_recommendation_signals.yaml"
 - "!include public_data_export_jobs.yaml"
 - "!include public_account_deletion_requests.yaml"
+- "!include public_automation_tokens.yaml"

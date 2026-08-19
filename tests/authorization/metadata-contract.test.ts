@@ -123,7 +123,10 @@ describe("Hasura metadata authorization contract", () => {
     expect(permissionFor(importFiles, "insert", "user")?.columns).not.toContain(
       "source_provenance",
     );
-    expect(permissionFor(importFiles, "update", "user")?.columns).not.toContain(
+    // Processing writes provenance after insert via the user JWT. Hasura cannot
+    // tell a Route Handler from a client, so update is allowed; insert is not,
+    // which stops a forged row from being born already "approved".
+    expect(permissionFor(importFiles, "update", "user")?.columns).toContain(
       "source_provenance",
     );
   });

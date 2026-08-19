@@ -1,7 +1,8 @@
 import type { FileKind } from "@/lib/import/detect";
 import type { ParseResult } from "@/lib/import/types";
 
-export type ImportProviderId = "garmin-file" | "garmin-api" | "garmindb";
+export type ImportProviderId =
+  "garmin-file" | "garmin-api" | "garmindb" | "garmin-connect";
 
 export type ImportParseContext = {
   fileKind: FileKind;

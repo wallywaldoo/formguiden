@@ -72,6 +72,7 @@ lib/
     csv/
     zip/
     garmindb/         # GarminDB garmin.db adapter
+    garmin-connect/   # JSON payload from the local python-garminconnect runner
     credentials/      # content-based credential rejection
   analytics/
   ai/

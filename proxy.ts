@@ -11,9 +11,26 @@ const publicRoutes = [
   "/callback",
 ];
 
+/**
+ * Routes that authenticate with a bearer token instead of the session cookie.
+ * They must bypass the proxy entirely: there is no cookie to refresh, and
+ * redirecting an API call to /login would hand the caller an HTML login page
+ * instead of a 401 it can act on.
+ */
+const tokenAuthRoutes = ["/api/ingest"];
+
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
   const path = request.nextUrl.pathname;
+
+  if (
+    tokenAuthRoutes.some(
+      (route) => path === route || path.startsWith(`${route}/`),
+    )
+  ) {
+    return response;
+  }
+
   const isPublicRoute = publicRoutes.some(
     (route) => path === route || path.startsWith(`${route}/`),
   );

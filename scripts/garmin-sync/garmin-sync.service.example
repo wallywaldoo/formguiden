@@ -1,0 +1,7 @@
+[Unit]
+Description=Formkurvan Garmin Connect sync
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/YOU/formkurvan
+ExecStart=/home/YOU/.local/bin/uv run --python 3.12 --with garminconnect==0.3.2 --with requests python scripts/garmin-sync/sync.py --days 3

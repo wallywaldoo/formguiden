@@ -20,6 +20,7 @@ import type { ImportProviderId } from "@/lib/import/adapters/types";
 import { sha256Hex } from "@/lib/import/checksum";
 import { scanForCredentialMaterial } from "@/lib/import/credentials/scan";
 import { detectFileKind } from "@/lib/import/detect";
+import { GarminConnectRejectionError } from "@/lib/import/garmin-connect";
 import { entriesContainDatabase } from "@/lib/import/garmindb/archive";
 import { GarminDbRejectionError } from "@/lib/import/garmindb/errors";
 import { PREVIEW_TTL_DAYS, PROCESS_LEASE_SECONDS } from "@/lib/import/limits";
@@ -47,6 +48,7 @@ type ImportFileRow = {
   zip_entry_path: string | null;
   error_code: string | null;
   error_message: string | null;
+  source_provenance: Record<string, unknown> | null;
 };
 
 type ImportJobRow = {
@@ -463,11 +465,14 @@ export async function processImportSlice(
     const message =
       error instanceof ZipLimitError ||
       error instanceof GarminDbRejectionError ||
+      error instanceof GarminConnectRejectionError ||
       error instanceof Error
         ? error.message
         : "Kunde inte bearbeta filen.";
     const code =
-      error instanceof ZipLimitError || error instanceof GarminDbRejectionError
+      error instanceof ZipLimitError ||
+      error instanceof GarminDbRejectionError ||
+      error instanceof GarminConnectRejectionError
         ? error.code
         : "process_error";
     await markFile(current.id, "failed", {

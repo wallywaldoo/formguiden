@@ -61,6 +61,7 @@ Starter limits: pause after 7 days of inactivity, **no automated backups**, 1 GB
 | [docs/user-flows.md](docs/user-flows.md)                           | End-to-end user flows                                   |
 | [docs/data-import-strategy.md](docs/data-import-strategy.md)       | Garmin file import, limits, and resumable processing    |
 | [docs/garmindb-compatibility.md](docs/garmindb-compatibility.md)   | GarminDB local-export path (implemented)                |
+| [scripts/garmin-sync/README.md](scripts/garmin-sync/README.md)     | Local garmin-connect runner                             |
 | [docs/database-schema.md](docs/database-schema.md)                 | PostgreSQL model, constraints, and retention            |
 | [docs/security-model.md](docs/security-model.md)                   | Auth, Hasura, Storage, and authorization tests          |
 | [docs/ai-nutrition-estimation.md](docs/ai-nutrition-estimation.md) | Opt-in calorie estimation design (no paid provider yet) |

@@ -3,6 +3,10 @@ import type { ImportProviderId } from "@/lib/import/adapters/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { scanForCredentialMaterial } from "@/lib/import/credentials/scan";
 import { detectFileKind, type FileKind } from "@/lib/import/detect";
+import {
+  GarminConnectRejectionError,
+  parseGarminConnectUpload,
+} from "@/lib/import/garmin-connect";
 import { parseGarminDbUpload } from "@/lib/import/garmindb";
 import { entriesContainDatabase } from "@/lib/import/garmindb/archive";
 import { GarminDbRejectionError } from "@/lib/import/garmindb/errors";
@@ -98,6 +102,23 @@ export async function inspectAndParse(
     } catch (error) {
       if (error instanceof GarminDbRejectionError) {
         return rejected(kind, "garmindb", error.code, error.message);
+      }
+      throw error;
+    }
+  }
+
+  if (kind === "json") {
+    try {
+      const outcome = parseGarminConnectUpload(bytes);
+      return {
+        kind,
+        source: "garmin-connect",
+        parse: outcome.result,
+        provenance: { garminConnect: outcome.provenance },
+      };
+    } catch (error) {
+      if (error instanceof GarminConnectRejectionError) {
+        return rejected(kind, "garmin-connect", error.code, error.message);
       }
       throw error;
     }

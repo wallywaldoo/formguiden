@@ -52,6 +52,7 @@ export const GET_IMPORT = /* GraphQL */ `
       zip_entry_path
       error_code
       error_message
+      source_provenance
     }
     import_jobs(where: { import_id: { _eq: $id } }, limit: 1) {
       id
@@ -130,6 +131,36 @@ export const LIST_IMPORTS = /* GraphQL */ `
       created_at
       committed_at
       error_summary
+      provider
+    }
+  }
+`;
+
+export const LIST_RECENT_IMPORTS = /* GraphQL */ `
+  query ListRecentImports($since: timestamptz!) {
+    data_imports(
+      where: { created_at: { _gte: $since } }
+      order_by: { created_at: desc }
+      limit: 50
+    ) {
+      id
+      created_at
+    }
+  }
+`;
+
+export const GET_LAST_COMMITTED_PROVENANCE = /* GraphQL */ `
+  query GetLastCommittedProvenance {
+    import_files(
+      where: {
+        status: { _eq: "committed" }
+        source_provenance: { _is_null: false }
+      }
+      order_by: { updated_at: desc }
+      limit: 20
+    ) {
+      id
+      source_provenance
     }
   }
 `;

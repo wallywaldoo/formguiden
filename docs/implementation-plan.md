@@ -233,6 +233,16 @@ Activity import from SQLite, monitoring tables, summary tables, automatic sync, 
 
 ---
 
+## Phase 7 — Local garmin-connect automation (implemented)
+
+A user-owned runner (`scripts/garmin-sync`) uses `python-garminconnect` on the user's machine and posts to `/api/ingest`. Garmin credentials never enter Formkurvan. First run stays on preview; later runs auto-commit when engine, library version, and script version match the last approved import.
+
+In: PAT-authenticated ingest, JSON health payload, FIT upload for activities, body-measurement dedupe index.
+
+Out: embedding Garmin login in the web app, unofficial credentials in Nhost, Apple Health, a native iOS app.
+
+---
+
 ## Expected upgrade point (cost)
 
 Do **not** upgrade without approval. The first likely paid step is **Nhost Pro from $25/month** when any of these is true:
@@ -271,16 +281,4 @@ See [product-spec.md](product-spec.md) §8. Owner should confirm especially:
 
 ## Exactly one next phase
 
-**Phase 6 — GarminDB compatibility.** Design approved 18 August 2026. Implementation may start.
-
-Suggested order, smallest verifiable slice first:
-
-1. `lib/import/credentials/scan.ts` plus its negative tests. Nothing else lands until rejection works.
-2. `lib/import/garmindb/fingerprint.ts` and `open.ts` — SQLite detection, version pin, sandbox limits.
-3. `queries.ts`, `units.ts`, `map.ts` — frozen SELECTs and canonical mapping, with the statute-conversion tests.
-4. `adapters/garmindb.ts` wired into the existing preview and confirm pipeline.
-5. Migrations and metadata: `garmindb-quarantine` bucket, `garmindb` source value, provenance columns.
-6. UI: upload entry point, preview with measurement system and timezone disclosure, rejection states.
-7. Cross-tenant authorization tests (§10.4 tests 30–40) before the phase closes.
-
-Steps 1 and 7 are non-negotiable gates. Do not ship the adapter with the credential scan or the isolation tests outstanding.
+**Phase 7 — Local garmin-connect automation.** Implemented. Remaining: live Nhost migration apply, first-run confirm in the UI, and a machine that stays awake for the schedule.
