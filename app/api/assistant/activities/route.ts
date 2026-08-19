@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { withAssistantAuth, withCors } from "@/lib/api/assistant-auth";
+import sql from "@/lib/db";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -19,64 +20,26 @@ export async function GET(request: Request) {
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "10", 10), 50);
     const offset = parseInt(searchParams.get("offset") ?? "0", 10);
 
-    // TODO: replace with DB query
-    const allActivities = [
-      {
-        id: "act-001",
-        startedAt: "2026-08-19T06:30:00Z",
-        sport: "running",
-        durationS: 3780,
-        distanceM: 12500,
-        avgHeartRateBpm: 148,
-        elevationGainM: 95,
-        title: "Morgonlöpning",
-      },
-      {
-        id: "act-002",
-        startedAt: "2026-08-17T08:00:00Z",
-        sport: "running",
-        durationS: 4500,
-        distanceM: 15000,
-        avgHeartRateBpm: 152,
-        elevationGainM: 130,
-        title: "Långpass",
-      },
-      {
-        id: "act-003",
-        startedAt: "2026-08-15T06:15:00Z",
-        sport: "running",
-        durationS: 2700,
-        distanceM: 8000,
-        avgHeartRateBpm: 160,
-        elevationGainM: 60,
-        title: "Intervaller 4x2km",
-      },
-      {
-        id: "act-004",
-        startedAt: "2026-08-13T07:00:00Z",
-        sport: "running",
-        durationS: 3300,
-        distanceM: 10500,
-        avgHeartRateBpm: 145,
-        elevationGainM: 80,
-        title: "Lätt löpning",
-      },
-      {
-        id: "act-005",
-        startedAt: "2026-08-11T06:45:00Z",
-        sport: "running",
-        durationS: 5400,
-        distanceM: 18000,
-        avgHeartRateBpm: 150,
-        elevationGainM: 175,
-        title: "Söndagslångpass",
-      },
-    ];
+    const [rows, countRows] = await Promise.all([
+      sql`
+        SELECT
+          id::text,
+          started_at                   AS "startedAt",
+          activity_type                AS sport,
+          duration_s::int              AS "durationS",
+          distance_m::float            AS "distanceM",
+          avg_heart_rate_bpm::float    AS "avgHeartRateBpm",
+          elevation_gain_m::float      AS "elevationGainM",
+          notes                        AS title
+        FROM activities
+        ORDER BY started_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `,
+      sql`SELECT COUNT(*)::int AS total FROM activities`,
+    ]);
 
-    const paged = allActivities.slice(offset, offset + limit);
+    const total = (countRows[0] as { total: number })?.total ?? 0;
 
-    return withCors(
-      NextResponse.json({ activities: paged, total: allActivities.length }),
-    );
+    return withCors(NextResponse.json({ activities: rows, total }));
   });
 }

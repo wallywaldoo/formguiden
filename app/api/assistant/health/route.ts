@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { withAssistantAuth, withCors } from "@/lib/api/assistant-auth";
+import sql from "@/lib/db";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -18,23 +19,20 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const days = Math.min(parseInt(searchParams.get("days") ?? "7", 10), 30);
 
-    // TODO: replace with DB query
-    const today = new Date("2026-08-19");
-    const mockDays = Array.from({ length: days }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      return {
-        date: date.toISOString().split("T")[0],
-        restingHeartRateBpm: 50 + Math.round(Math.random() * 8),
-        hrvRmssdMs: 60 + Math.round(Math.random() * 20),
-        sleepDurationS: 23400 + Math.round(Math.random() * 7200),
-        sleepScore: 78 + Math.round(Math.random() * 15),
-        stressAvg: 28 + Math.round(Math.random() * 15),
-        bodyBatteryHigh: 85 + Math.round(Math.random() * 12),
-        steps: 7000 + Math.round(Math.random() * 5000),
-      };
-    });
+    const rows = await sql`
+      SELECT
+        local_date::text                                   AS date,
+        resting_heart_rate_bpm::float                      AS "restingHeartRateBpm",
+        hrv_rmssd_ms::float                                AS "hrvRmssdMs",
+        sleep_duration_s::int                              AS "sleepDurationS",
+        stress_avg::float                                  AS "stressAvg",
+        body_battery_high::float                           AS "bodyBatteryHigh",
+        steps::int                                         AS steps
+      FROM daily_health_metrics
+      ORDER BY local_date DESC
+      LIMIT ${days}
+    `;
 
-    return withCors(NextResponse.json({ days: mockDays }));
+    return withCors(NextResponse.json({ days: rows }));
   });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { withAssistantAuth, withCors } from "@/lib/api/assistant-auth";
+import sql from "@/lib/db";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -15,57 +16,83 @@ export async function OPTIONS() {
 
 export async function GET(request: Request) {
   return withAssistantAuth(request, async () => {
-    // TODO: replace with DB queries for all sections
+    const [activityRows, healthRows, goalRows, profileRows] = await Promise.all([
+      sql`
+        SELECT
+          id::text,
+          started_at               AS "startedAt",
+          activity_type            AS sport,
+          duration_s::int          AS "durationS",
+          distance_m::float        AS "distanceM",
+          avg_heart_rate_bpm::float AS "avgHeartRateBpm",
+          elevation_gain_m::float  AS "elevationGainM",
+          notes                    AS title
+        FROM activities
+        ORDER BY started_at DESC
+        LIMIT 5
+      `,
+      sql`
+        SELECT
+          AVG(hrv_rmssd_ms)::float          AS "avgHrvLast7Days",
+          AVG(resting_heart_rate_bpm)::float AS "avgRestingHrLast7Days",
+          AVG(sleep_duration_s)::float       AS "avgSleepSLast7Days",
+          AVG(stress_avg)::float             AS "avgStressLast7Days"
+        FROM daily_health_metrics
+        WHERE local_date >= CURRENT_DATE - INTERVAL '7 days'
+      `,
+      sql`
+        SELECT
+          race_type              AS "raceType",
+          race_date              AS "raceDate",
+          target_pace_s_per_km   AS "targetPaceSPerKm",
+          weekly_run_distance_m  AS "weeklyRunDistanceM"
+        FROM goals
+        WHERE status = 'active'
+        LIMIT 1
+      `,
+      sql`SELECT display_name FROM profiles LIMIT 1`,
+    ]);
 
-    const summary = {
-      generatedAt: new Date().toISOString(),
-      recentActivities: [
-        {
-          id: "act-001",
-          startedAt: "2026-08-19T06:30:00Z",
-          sport: "running",
-          durationS: 3780,
-          distanceM: 12500,
-          avgHeartRateBpm: 148,
-          elevationGainM: 95,
-          title: "Morgonlöpning",
-        },
-        {
-          id: "act-002",
-          startedAt: "2026-08-17T08:00:00Z",
-          sport: "running",
-          durationS: 4500,
-          distanceM: 15000,
-          avgHeartRateBpm: 152,
-          elevationGainM: 130,
-          title: "Långpass",
-        },
-        {
-          id: "act-003",
-          startedAt: "2026-08-15T06:15:00Z",
-          sport: "running",
-          durationS: 2700,
-          distanceM: 8000,
-          avgHeartRateBpm: 160,
-          elevationGainM: 60,
-          title: "Intervaller 4x2km",
-        },
-      ],
-      healthTrend: {
-        avgHrvLast7Days: 65,
-        avgRestingHrLast7Days: 53,
-        avgSleepHoursLast7Days: 7.2,
-        trainingLoad: "moderate",
-      },
-      currentGoal: {
-        raceType: "Halvmarathon",
-        raceDate: "2026-10-04",
-        targetPace: "5:00/km",
-      },
-      coachingContext:
-        "Viktor tränar inför ett halvmarathon om 6 veckor. HRV-trenden de senaste dagarna visar god återhämtning (snitt 65 ms). De tre senaste löpningarna kördes i lugnt tempo förutom ett intervallpass. Veckovolymen ligger på ca 50 km.",
-    };
+    const health = healthRows[0] as {
+      avgHrvLast7Days: number | null;
+      avgRestingHrLast7Days: number | null;
+      avgSleepSLast7Days: number | null;
+      avgStressLast7Days: number | null;
+    } | undefined;
 
-    return withCors(NextResponse.json(summary));
+    const goal = goalRows[0] as {
+      raceType: string;
+      raceDate: string | null;
+      targetPaceSPerKm: number | null;
+      weeklyRunDistanceM: number | null;
+    } | undefined;
+
+    const profile = profileRows[0] as { display_name: string } | undefined;
+
+    const avgSleepH =
+      health?.avgSleepSLast7Days != null
+        ? Math.round((health.avgSleepSLast7Days / 3600) * 10) / 10
+        : null;
+
+    return withCors(
+      NextResponse.json({
+        generatedAt: new Date().toISOString(),
+        recentActivities: activityRows,
+        healthTrend: {
+          avgHrvLast7Days: health?.avgHrvLast7Days
+            ? Math.round(health.avgHrvLast7Days)
+            : null,
+          avgRestingHrLast7Days: health?.avgRestingHrLast7Days
+            ? Math.round(health.avgRestingHrLast7Days)
+            : null,
+          avgSleepHoursLast7Days: avgSleepH,
+          avgStressLast7Days: health?.avgStressLast7Days
+            ? Math.round(health.avgStressLast7Days)
+            : null,
+        },
+        currentGoal: goal ?? null,
+        name: profile?.display_name ?? null,
+      }),
+    );
   });
 }
