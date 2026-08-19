@@ -21,19 +21,13 @@ export async function POST(request: Request) {
     const schemaPath = join(process.cwd(), "db", "schema.sql");
     const schema = await readFile(schemaPath, "utf8");
 
-    // Split on semicolons and run each statement individually
-    const statements = schema
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith("--"));
-
-    for (const statement of statements) {
-      await sql.unsafe(statement + ";");
-    }
+    // Run the schema as one script. It contains PL/pgSQL function bodies with
+    // internal semicolons, so naive splitting breaks on RETURN/END statements.
+    await sql.unsafe(schema);
 
     return NextResponse.json({
       ok: true,
-      message: `Ran ${statements.length} schema statements successfully.`,
+      message: "Schema applied successfully.",
     });
   } catch (error) {
     console.error("Schema migration failed:", error);
