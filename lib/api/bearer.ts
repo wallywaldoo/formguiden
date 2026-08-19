@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runWithSession } from "@/lib/nhost/session-context";
-
-// TODO [migration]: Replace Nhost PAT auth with a simple API key check
-// using INGEST_API_KEY env var.
+import { runWithSession } from "@/lib/session-context";
 
 export type BearerContext = {
   userId: string;

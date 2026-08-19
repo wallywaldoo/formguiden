@@ -6,9 +6,7 @@ import { todayLocal } from "@/lib/analytics/dates";
 import { goalPaceGap, weeklyRunDistance } from "@/lib/analytics/running";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_DASHBOARD } from "@/lib/graphql/queries/dashboard";
-import { GET_PROFILE_SETTINGS } from "@/lib/graphql/queries/profile";
+import { getGoalsPageData } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { asRaceType } from "@/lib/race-type";
 import { formatDistanceKm } from "@/lib/units/format";
@@ -18,22 +16,14 @@ export default async function GoalsPage() {
   const now = new Date();
   const since = new Date(now.getTime() - 100 * 86_400_000).toISOString();
 
-  let settings: SettingsPayload | null = null;
-  let dashboard: DashboardSlice | null = null;
+  let pageData: { user_preferences: SettingsPayload["user_preferences"]; goals: SettingsPayload["goals"]; activities: DashboardSlice["activities"] } | null = null;
   try {
-    [settings, dashboard] = await Promise.all([
-      graphqlRequest<SettingsPayload>(GET_PROFILE_SETTINGS),
-      graphqlRequest<DashboardSlice>(GET_DASHBOARD, {
-        since,
-        since_date: since.slice(0, 10),
-      }),
-    ]);
+    pageData = await getGoalsPageData(since);
   } catch {
-    settings = null;
-    dashboard = null;
+    pageData = null;
   }
 
-  if (!settings || !dashboard) {
+  if (!pageData) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-semibold tracking-tight">Mål</h1>
@@ -42,6 +32,8 @@ export default async function GoalsPage() {
     );
   }
 
+  const settings = pageData;
+  const dashboard = pageData;
   const goal = settings.goals[0];
   const context: AnalyticsContext = {
     timeZone: settings.user_preferences[0]?.timezone || DEFAULT_TIMEZONE,

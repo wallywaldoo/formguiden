@@ -7,7 +7,7 @@ import {
 import { detectFileKind } from "@/lib/import/detect";
 import { parseGarminConnectUpload } from "@/lib/import/garmin-connect";
 import { inspectAndParse } from "@/lib/import/parse-bytes";
-import { runWithSession, hasContextSession } from "@/lib/nhost/session-context";
+import { runWithSession, hasContextSession } from "@/lib/session-context";
 
 const encoder = new TextEncoder();
 

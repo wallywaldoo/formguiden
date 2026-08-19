@@ -18,7 +18,6 @@
   "dependencies": {
     "@garmin/fitsdk": "21.213.0",
     "@hookform/resolvers": "5.9.1",
-    "@nhost/nhost-js": "4.8.0",
     "@xmldom/xmldom": "0.9.11",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",

@@ -9,20 +9,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { graphqlRequest } from "@/lib/graphql/client";
-import {
-  GET_LAST_AUTOMATED_IMPORT,
-  LIST_AUTOMATION_TOKENS,
-} from "@/lib/graphql/mutations/automation";
+import sql from "@/lib/db";
 
 export default async function IntegrationsSettingsPage() {
-  let tokens: Array<{
+  const tokens: Array<{
     id: string;
     label: string;
     expires_at: string;
     revoked_at: string | null;
     created_at: string;
   }> = [];
+
   let lastImport: {
     status: string;
     created_at: string;
@@ -31,24 +28,14 @@ export default async function IntegrationsSettingsPage() {
   } | null = null;
 
   try {
-    const tokenData = await graphqlRequest<{
-      automation_tokens: typeof tokens;
-    }>(LIST_AUTOMATION_TOKENS);
-    tokens = tokenData.automation_tokens;
-  } catch {
-    tokens = [];
-  }
-
-  try {
-    const importData = await graphqlRequest<{
-      data_imports: Array<{
-        status: string;
-        created_at: string;
-        committed_at: string | null;
-        committed_count: number;
-      }>;
-    }>(GET_LAST_AUTOMATED_IMPORT);
-    lastImport = importData.data_imports[0] ?? null;
+    const rows = await sql`
+      SELECT status, created_at, committed_at, committed_count
+      FROM data_imports
+      WHERE provider = 'garmin-sync'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    lastImport = (rows[0] as unknown as { status: string; created_at: string; committed_at: string | null; committed_count: number }) ?? null;
   } catch {
     lastImport = null;
   }

@@ -21,8 +21,7 @@ import { IMPORT_STATUS_LABEL } from "@/features/imports/labels";
 import { CatchUpDropzone } from "@/features/sync/catch-up-dropzone";
 import { GarminDbNote } from "@/features/sync/garmindb-note";
 import { RitualCards } from "@/features/sync/ritual-cards";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_IMPORTS } from "@/lib/graphql/queries/imports";
+import { listImports } from "@/lib/db/queries";
 
 export default async function ImportPage({
   searchParams,
@@ -42,10 +41,7 @@ export default async function ImportPage({
     error_summary: string | null;
   }> = [];
   try {
-    const data = await graphqlRequest<{ data_imports: typeof imports }>(
-      LIST_IMPORTS,
-    );
-    imports = data.data_imports;
+    imports = await listImports();
   } catch {
     imports = [];
   }

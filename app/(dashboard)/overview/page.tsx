@@ -29,8 +29,7 @@ import { toDatetimeLocal } from "@/lib/analytics/dates";
 import { dailyDistanceSeries } from "@/lib/analytics/running";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_DASHBOARD } from "@/lib/graphql/queries/dashboard";
+import { getDashboardData } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import {
   formatDistanceKm,
@@ -46,10 +45,7 @@ export default async function OverviewPage() {
 
   let data: DashboardPayload | null = null;
   try {
-    data = await graphqlRequest<DashboardPayload>(GET_DASHBOARD, {
-      since,
-      since_date: sinceDate,
-    });
+    data = await getDashboardData(since, sinceDate);
   } catch {
     data = null;
   }

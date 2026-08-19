@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { LandedStory } from "@/features/sync/landed-story";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_IMPORT_LANDING } from "@/lib/graphql/queries/imports";
+import { getImportLanding } from "@/lib/db/queries";
 
 export default async function ImportLandedPage({
   params,
@@ -12,7 +11,7 @@ export default async function ImportLandedPage({
   const { id } = await params;
   let data: LandingPayload | null = null;
   try {
-    data = await graphqlRequest<LandingPayload>(GET_IMPORT_LANDING, { id });
+    data = await getImportLanding(id);
   } catch {
     data = null;
   }

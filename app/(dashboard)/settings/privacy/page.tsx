@@ -8,8 +8,7 @@ import {
 import { ExportPanel } from "@/features/privacy/export-panel";
 import { AccountDeletionForm } from "@/features/privacy/deletion-form";
 import { PRIVACY_DOCUMENT_VERSION } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_EXPORT_JOBS } from "@/lib/graphql/queries/coaching";
+import { listExportJobs } from "@/lib/db/queries";
 
 export default async function PrivacySettingsPage() {
   let jobs: Array<{
@@ -21,10 +20,7 @@ export default async function PrivacySettingsPage() {
   }> = [];
 
   try {
-    const data = await graphqlRequest<{
-      data_export_jobs: typeof jobs;
-    }>(LIST_EXPORT_JOBS);
-    jobs = data.data_export_jobs;
+    jobs = await listExportJobs();
   } catch {
     jobs = [];
   }
@@ -51,8 +47,8 @@ export default async function PrivacySettingsPage() {
             vård.
           </p>
           <p>
-            Session-cookien är läsbar för JavaScript enligt Nhosts officiella
-            Next.js-recept. Ett XSS-hål skulle kunna stjäla sessionen.
+            Session-cookien är httpOnly och skyddad mot XSS.
+            En CSRF-attack mot formulär motverkas av SameSite=lax.
           </p>
         </CardContent>
       </Card>

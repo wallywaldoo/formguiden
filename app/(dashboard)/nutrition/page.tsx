@@ -12,8 +12,7 @@ import { NutritionForm } from "@/features/nutrition/nutrition-form";
 import { isNutritionAiEnabled } from "@/lib/ai/nutrition/create-estimator";
 import { toDatetimeLocal, toLocalDate } from "@/lib/analytics/dates";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_NUTRITION } from "@/lib/graphql/queries/logging";
+import { listNutrition } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatVolumeMl } from "@/lib/units/format";
 import {
@@ -50,7 +49,7 @@ export default async function NutritionPage({
 
   let data: NutritionPayload | null = null;
   try {
-    data = await graphqlRequest<NutritionPayload>(LIST_NUTRITION, { since });
+    data = await listNutrition(since);
   } catch {
     data = null;
   }

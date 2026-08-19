@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { processImportSlice } from "@/features/imports/process-slice";
-import { getSessionUserId } from "@/lib/nhost/server";
+import { getSessionUserId } from "@/lib/auth";
 
 export const maxDuration = 30;
 

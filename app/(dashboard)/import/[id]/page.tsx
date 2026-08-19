@@ -23,8 +23,7 @@ import {
   FILE_STATUS_LABEL,
   IMPORT_STATUS_LABEL,
 } from "@/features/imports/labels";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_IMPORT } from "@/lib/graphql/queries/imports";
+import { getImportDetail } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatPaceMinPerKm } from "@/lib/units/pace";
 
@@ -36,7 +35,7 @@ export default async function ImportDetailPage({
   const { id } = await params;
   let data: ImportPayload | null = null;
   try {
-    data = await graphqlRequest<ImportPayload>(GET_IMPORT, { id });
+    data = await getImportDetail(id);
   } catch {
     data = null;
   }

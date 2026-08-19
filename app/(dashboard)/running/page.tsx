@@ -24,8 +24,7 @@ import { ACTIVITY_TYPE_LABEL } from "@/features/imports/labels";
 import { dailyDistanceSeries, rollingDistance } from "@/lib/analytics/running";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_ACTIVITIES } from "@/lib/graphql/queries/dashboard";
+import { listActivities } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatDistanceKm, formatElevation } from "@/lib/units/format";
 import { formatDurationHms, formatPaceMinPerKm } from "@/lib/units/pace";
@@ -36,9 +35,7 @@ export default async function RunningPage() {
 
   let data: RunningPayload | null = null;
   try {
-    data = await graphqlRequest<RunningPayload>(LIST_ACTIVITIES, {
-      since,
-    });
+    data = await listActivities(since);
   } catch {
     data = null;
   }

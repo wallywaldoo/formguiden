@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { handleNhostProxy } from "@/lib/nhost/server";
+import { handleNhostProxy } from "@/lib/auth";
 
 const publicRoutes = [
   "/",

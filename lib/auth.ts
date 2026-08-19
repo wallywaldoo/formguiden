@@ -69,4 +69,24 @@ export function hasSessionCookie(
 
 export { SESSION_COOKIE_NAME };
 
-// TODO [migration]: Consider adding session token storage in DB for revocation.
+/**
+ * Returns "single-user" when authenticated, null otherwise.
+ * Replaces the old nhost.getSessionUserId() shim.
+ */
+export async function getSessionUserId(): Promise<string | null> {
+  const ok = await getSession();
+  return ok ? "single-user" : null;
+}
+
+/**
+ * Middleware auth check — returns a user object when a session cookie is present.
+ */
+export async function handleNhostProxy(
+  request: Pick<Request, "headers">,
+  _response: unknown,
+): Promise<{ user: { id: string } } | null> {
+  if (hasSessionCookie(request)) {
+    return { user: { id: "single-user" } };
+  }
+  return null;
+}

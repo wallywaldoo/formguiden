@@ -26,8 +26,7 @@ import { bodyWeightTrend, latestMass, massSeries } from "@/lib/analytics/body";
 import { toDatetimeLocal } from "@/lib/analytics/dates";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_BODY } from "@/lib/graphql/queries/dashboard";
+import { listBodyMeasurements } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatMassKg } from "@/lib/units/format";
 
@@ -37,7 +36,7 @@ export default async function BodyPage() {
 
   let data: BodyPayload | null = null;
   try {
-    data = await graphqlRequest<BodyPayload>(LIST_BODY, { since });
+    data = await listBodyMeasurements(since);
   } catch {
     data = null;
   }

@@ -1,19 +1,9 @@
 import { ProfileSettingsForm } from "@/features/profiles/profile-settings-form";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_PROFILE_SETTINGS } from "@/lib/graphql/queries/profile";
+import { getProfileSettings } from "@/lib/db/queries";
 import { listTimeZones } from "@/lib/timezones";
 
 export default async function ProfileSettingsPage() {
-  const data = await graphqlRequest<{
-    profiles: Array<{ display_name: string | null }>;
-    user_preferences: Array<{
-      timezone: string;
-      distance_unit: string;
-      mass_unit: string;
-      elevation_unit: string;
-      volume_unit: string;
-    }>;
-  }>(GET_PROFILE_SETTINGS);
+  const data = await getProfileSettings();
 
   const profile = data.profiles[0];
   const preferences = data.user_preferences[0];

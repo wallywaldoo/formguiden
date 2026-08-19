@@ -1,7 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-// TODO [migration]: Simplify once bearer auth is replaced with simple API key.
-
 type SessionHolder = { current: { user: { id: string } } };
 
 const sessionStore = new AsyncLocalStorage<SessionHolder>();

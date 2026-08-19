@@ -8,9 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CancelDeletionForm } from "@/features/privacy/cancel-deletion-form";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_PENDING_DELETION } from "@/lib/graphql/queries/coaching";
 import { redirect } from "next/navigation";
+
+import { getPendingDeletion } from "@/lib/db/queries";
 
 export default async function DeletionPendingPage() {
   let pending: {
@@ -20,14 +20,7 @@ export default async function DeletionPendingPage() {
   } | null = null;
 
   try {
-    const data = await graphqlRequest<{
-      account_deletion_requests: Array<{
-        id: string;
-        requested_at: string;
-        purge_after: string;
-      }>;
-    }>(GET_PENDING_DELETION);
-    pending = data.account_deletion_requests[0] ?? null;
+    pending = await getPendingDeletion();
   } catch {
     pending = null;
   }

@@ -27,8 +27,7 @@ import {
 } from "@/lib/analytics/recovery";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_RECOVERY } from "@/lib/graphql/queries/dashboard";
+import { listRecovery } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatHours } from "@/lib/units/format";
 
@@ -40,9 +39,7 @@ export default async function RecoveryPage() {
 
   let data: RecoveryPayload | null = null;
   try {
-    data = await graphqlRequest<RecoveryPayload>(LIST_RECOVERY, {
-      since_date: sinceDate,
-    });
+    data = await listRecovery(sinceDate);
   } catch {
     data = null;
   }

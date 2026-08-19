@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/forms/submit-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { forgotPasswordAction, type ActionResult } from "@/lib/nhost/actions";
+import { forgotPasswordAction, type ActionResult } from "@/lib/auth-actions";
 
 const initialState: ActionResult = {};
 

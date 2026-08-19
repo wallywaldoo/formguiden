@@ -18,8 +18,7 @@ import {
 import { ActivityNotesForm } from "@/features/activities/activity-notes-form";
 import { BackendUnavailable } from "@/features/dashboard/backend-unavailable";
 import { ACTIVITY_TYPE_LABEL } from "@/features/imports/labels";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_ACTIVITY } from "@/lib/graphql/queries/dashboard";
+import { getActivity } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatDistanceKm, formatElevation } from "@/lib/units/format";
 import { formatDurationHms, formatPaceMinPerKm } from "@/lib/units/pace";
@@ -33,7 +32,7 @@ export default async function ActivityDetailPage({
 
   let data: ActivityPayload | null = null;
   try {
-    data = await graphqlRequest<ActivityPayload>(GET_ACTIVITY, { id });
+    data = await getActivity(id);
   } catch {
     data = null;
   }

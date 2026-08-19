@@ -18,8 +18,7 @@ import type { AnalyticsContext } from "@/lib/analytics/types";
 import { weeklyRunDistance } from "@/lib/analytics/running";
 import { sleepDurationMean } from "@/lib/analytics/recovery";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_WEEKLY_REPORT } from "@/lib/graphql/queries/coaching";
+import { getWeeklyReportData } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatDistanceKm, formatHours } from "@/lib/units/format";
 
@@ -29,11 +28,7 @@ export default async function WeeklyReportPage() {
 
   let data: WeeklyReportPayload | null = null;
   try {
-    data = await graphqlRequest<WeeklyReportPayload>(GET_WEEKLY_REPORT, {
-      since,
-      since_date: since.slice(0, 10),
-      now: now.toISOString(),
-    });
+    data = await getWeeklyReportData(since, since.slice(0, 10), now.toISOString()) as unknown as WeeklyReportPayload;
   } catch {
     data = null;
   }

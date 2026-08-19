@@ -29,8 +29,7 @@ import { strengthFrequency } from "@/lib/analytics/strength";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { toDatetimeLocal } from "@/lib/analytics/dates";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { LIST_STRENGTH } from "@/lib/graphql/queries/logging";
+import { listStrengthSessions } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatDurationHms } from "@/lib/units/pace";
 
@@ -40,7 +39,7 @@ export default async function StrengthPage() {
 
   let data: StrengthPayload | null = null;
   try {
-    data = await graphqlRequest<StrengthPayload>(LIST_STRENGTH, { since });
+    data = await listStrengthSessions(since);
   } catch {
     data = null;
   }

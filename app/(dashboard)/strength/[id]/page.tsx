@@ -31,8 +31,7 @@ import { StrengthSessionForm } from "@/features/strength/session-form";
 import { StrengthSetForm } from "@/features/strength/set-form";
 import { toDatetimeLocal } from "@/lib/analytics/dates";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_STRENGTH_SESSION } from "@/lib/graphql/queries/logging";
+import { getStrengthSession } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatMassKg } from "@/lib/units/format";
 
@@ -45,7 +44,7 @@ export default async function StrengthSessionPage({
 
   let data: SessionPayload | null = null;
   try {
-    data = await graphqlRequest<SessionPayload>(GET_STRENGTH_SESSION, { id });
+    data = await getStrengthSession(id);
   } catch {
     data = null;
   }
