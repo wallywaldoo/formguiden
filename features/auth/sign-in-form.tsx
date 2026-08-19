@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import Link from "next/link";
 
 import { SubmitButton } from "@/components/forms/submit-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,16 +23,6 @@ export function SignInForm({ initialError }: { initialError?: string }) {
       ) : null}
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="email">E-post</FieldLabel>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-          />
-        </Field>
-        <Field>
           <FieldLabel htmlFor="password">Lösenord</FieldLabel>
           <Input
             id="password"
@@ -45,14 +34,6 @@ export function SignInForm({ initialError }: { initialError?: string }) {
         </Field>
       </FieldGroup>
       <SubmitButton className="w-full">Logga in</SubmitButton>
-      <p className="text-center text-sm text-muted-foreground">
-        <Link
-          href="/forgot-password"
-          className="underline-offset-4 hover:underline"
-        >
-          Glömt lösenordet?
-        </Link>
-      </p>
     </form>
   );
 }

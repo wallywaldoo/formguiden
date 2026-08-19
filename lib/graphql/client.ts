@@ -1,4 +1,5 @@
-import { createNhostClient } from "@/lib/nhost/server";
+// TODO [migration]: Replace all graphqlRequest() calls with direct SQL queries
+// using lib/db.ts. This stub exists so the build passes during the transition.
 
 export class GraphQLRequestError extends Error {
   constructor(message: string) {
@@ -8,24 +9,10 @@ export class GraphQLRequestError extends Error {
 }
 
 export async function graphqlRequest<TData>(
-  query: string,
-  variables?: Record<string, unknown>,
+  _query: string,
+  _variables?: Record<string, unknown>,
 ): Promise<TData> {
-  const nhost = await createNhostClient();
-  const response = await nhost.graphql.request<TData>({
-    query,
-    variables,
-  });
-
-  if (response.body.errors?.length) {
-    throw new GraphQLRequestError(
-      response.body.errors[0]?.message ?? "GraphQL-förfrågan misslyckades.",
-    );
-  }
-
-  if (response.body.data === undefined) {
-    throw new GraphQLRequestError("Tomt GraphQL-svar.");
-  }
-
-  return response.body.data;
+  throw new GraphQLRequestError(
+    "GraphQL is disabled. Migrate this call to use lib/db.ts direct SQL queries.",
+  );
 }

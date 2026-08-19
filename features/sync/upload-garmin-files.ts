@@ -1,10 +1,8 @@
-import { startImportAction } from "@/features/imports/actions";
-import { GARMIN_IMPORTS_BUCKET } from "@/lib/constants";
 import { MAX_UPLOAD_BYTES } from "@/lib/import/limits";
-import { createBrowserNhostClient } from "@/lib/nhost/browser";
 
-// .db covers GarminDB's local garmin.db export. The extension is only a hint;
-// the server decides from content.
+// TODO [migration]: Reimplement file upload using Vercel Blob or a direct
+// server action instead of Nhost Storage.
+
 const ACCEPT_HINT = /(\.fit|\.tcx|\.gpx|\.csv|\.zip|\.db|\.json)$/i;
 
 export async function sha256Hex(file: File): Promise<string> {
@@ -41,44 +39,13 @@ export async function uploadGarminFiles(
     throw new Error("Max 20 filer åt gången. Ta en ZIP om du har fler.");
   }
 
-  const nhost = createBrowserNhostClient();
-  if (!nhost.getUserSession()) {
-    throw new Error("Sessionen saknas. Logga in igen.");
-  }
-
-  const uploaded: Array<{
-    id: string;
-    name: string;
-    type: string;
-    size: number;
-    sha256: string;
-  }> = [];
-
   for (const file of selected) {
     if (file.size > MAX_UPLOAD_BYTES) {
       throw new Error(`${file.name} är större än 25 MiB.`);
     }
-    const sha256 = await sha256Hex(file);
-    const response = await nhost.storage.uploadFiles({
-      "bucket-id": GARMIN_IMPORTS_BUCKET,
-      "file[]": [file],
-    });
-    const stored = response.body.processedFiles?.[0];
-    if (response.status !== 201 || !stored?.id) {
-      throw new Error(`Kunde inte ladda upp ${file.name}.`);
-    }
-    uploaded.push({
-      id: stored.id,
-      name: stored.name ?? file.name,
-      type: stored.mimeType ?? file.type,
-      size: stored.size ?? file.size,
-      sha256,
-    });
   }
 
-  const result = await startImportAction(uploaded);
-  if (result.error || !result.importId) {
-    throw new Error(result.error ?? "Kunde inte skapa importen.");
-  }
-  return { importId: result.importId };
+  throw new Error(
+    "Filuppladdning är inte implementerad ännu i den nya databasen.",
+  );
 }

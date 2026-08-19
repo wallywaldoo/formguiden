@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { SignInForm } from "@/features/auth/sign-in-form";
 
 export default async function LoginPage({
@@ -18,12 +16,6 @@ export default async function LoginPage({
         </p>
       </div>
       <SignInForm initialError={params.error} />
-      <p className="text-center text-sm text-muted-foreground">
-        Inget konto?{" "}
-        <Link href="/signup" className="underline-offset-4 hover:underline">
-          Skapa ett
-        </Link>
-      </p>
     </div>
   );
 }

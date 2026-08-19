@@ -1,26 +1,16 @@
 import { redirect } from "next/navigation";
 
 import { OnboardingForm } from "@/features/profiles/onboarding-form";
-import { graphqlRequest } from "@/lib/graphql/client";
-import { GET_ONBOARDING_STATE } from "@/lib/graphql/queries/profile";
-import { createNhostClient } from "@/lib/nhost/server";
+import { getSession } from "@/lib/auth";
 import { listTimeZones } from "@/lib/timezones";
 
-export default async function OnboardingPage() {
-  const nhost = await createNhostClient();
-  if (!nhost.getUserSession()?.user) {
-    redirect("/login");
-  }
+// TODO [migration]: Check onboarding state from Postgres instead of GraphQL.
+// For now, always show the form if user is authenticated.
 
-  try {
-    const data = await graphqlRequest<{
-      profiles: Array<{ onboarding_completed_at: string | null }>;
-    }>(GET_ONBOARDING_STATE);
-    if (data.profiles[0]?.onboarding_completed_at) {
-      redirect("/overview");
-    }
-  } catch {
-    // First-time users have no profile row yet.
+export default async function OnboardingPage() {
+  const authenticated = await getSession();
+  if (!authenticated) {
+    redirect("/login");
   }
 
   return (

@@ -1,11 +1,10 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { createNhostClient } from "@/lib/nhost/server";
+import { getSession } from "@/lib/auth";
 
 export default async function HomePage() {
-  const nhost = await createNhostClient();
-  const session = nhost.getUserSession();
+  const authenticated = await getSession();
 
   return (
     <main className="mx-auto flex min-h-full max-w-xl flex-col justify-center gap-8 px-6 py-16">
@@ -23,19 +22,14 @@ export default async function HomePage() {
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
-        {session ? (
+        {authenticated ? (
           <Button asChild>
             <Link href="/overview">Öppna översikten</Link>
           </Button>
         ) : (
-          <>
-            <Button asChild>
-              <Link href="/signup">Skapa konto</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/login">Logga in</Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link href="/login">Logga in</Link>
+          </Button>
         )}
       </div>
     </main>

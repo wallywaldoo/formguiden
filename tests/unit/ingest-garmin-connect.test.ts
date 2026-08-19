@@ -8,7 +8,6 @@ import { detectFileKind } from "@/lib/import/detect";
 import { parseGarminConnectUpload } from "@/lib/import/garmin-connect";
 import { inspectAndParse } from "@/lib/import/parse-bytes";
 import { runWithSession, hasContextSession } from "@/lib/nhost/session-context";
-import type { StoredSession } from "@nhost/nhost-js/session";
 
 const encoder = new TextEncoder();
 
@@ -106,13 +105,8 @@ describe("ingest rate limit", () => {
 describe("session context isolation", () => {
   it("does not leak a session outside runWithSession", async () => {
     const session = {
-      accessToken: "token",
-      accessTokenExpiresIn: 900,
-      refreshToken: "refresh",
-      refreshTokenId: "11111111-1111-1111-1111-111111111111",
       user: { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
-      decodedToken: {},
-    } as unknown as StoredSession;
+    };
 
     expect(hasContextSession()).toBe(false);
     await runWithSession(session, async () => {
