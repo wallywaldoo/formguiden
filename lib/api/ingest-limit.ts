@@ -1,4 +1,4 @@
-export const INGEST_MAX_IMPORTS_PER_DAY = 24;
+export const INGEST_MAX_IMPORTS_PER_DAY = 200;
 
 export function isOverIngestRateLimit(
   createdAt: string[],
