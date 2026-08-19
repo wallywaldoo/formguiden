@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/overview", label: "Översikt" },
+  { href: "/coach", label: "Coach" },
   { href: "/report", label: "Veckorapport" },
   { href: "/running", label: "Löpning" },
   { href: "/recovery", label: "Återhämtning" },
