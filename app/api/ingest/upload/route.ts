@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const file = formData.get("file");
-    if (!(file instanceof File) && !(file instanceof Blob)) {
+    if (!file || typeof file === "string") {
       return NextResponse.json(
         { error: "Fältet 'file' saknas eller är ogiltigt." },
         { status: 400 },
@@ -65,7 +65,9 @@ export async function POST(request: Request) {
     const body = new FormData();
     body.append("bucket-id", GARMIN_IMPORTS_BUCKET);
     const filename =
-      file instanceof File ? file.name : (formData.get("filename") as string) ?? "upload";
+      ("name" in file && typeof file.name === "string" ? file.name : null) ??
+      (formData.get("filename") as string) ??
+      "upload";
     body.append("file[]", file, filename);
     body.append(
       "metadata[]",
