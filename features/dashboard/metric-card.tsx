@@ -28,10 +28,10 @@ export function MetricCard({
   return (
     <Card className={cn("border-white/50", className)}>
       <CardHeader className="gap-3">
-        <CardDescription className="text-sm font-medium">
+        <CardDescription className="text-[0.95rem] font-medium tracking-[-0.01em]">
           {title}
         </CardDescription>
-        <CardTitle className="text-[2rem] font-semibold tracking-tight md:text-[2.4rem]">
+        <CardTitle className="text-[1.9rem] font-semibold tracking-[-0.045em] md:text-[2.2rem]">
           {value}
         </CardTitle>
       </CardHeader>
@@ -39,7 +39,7 @@ export function MetricCard({
         <CardContent>
           <div className="flex items-start justify-between gap-3">
             {caption ? (
-              <p className="text-sm leading-6 text-muted-foreground">
+              <p className="text-[0.95rem] leading-6 text-muted-foreground">
                 {caption}
               </p>
             ) : null}

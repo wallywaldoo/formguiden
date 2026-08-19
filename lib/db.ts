@@ -10,6 +10,11 @@ function createSql() {
   if (!connectionString) {
     throw new Error("POSTGRES_URL environment variable is not set");
   }
+  try {
+    new URL(connectionString);
+  } catch {
+    throw new Error("POSTGRES_URL environment variable is invalid");
+  }
   return postgres(connectionString, {
     // Vercel Postgres uses SSL in production
     ssl: process.env.NODE_ENV === "production" ? "require" : false,

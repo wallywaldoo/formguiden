@@ -50,17 +50,36 @@ export default async function OverviewPage() {
   const sinceDate = since.slice(0, 10);
 
   let data: DashboardPayload | null = null;
+  let dashboardError: unknown = null;
   try {
     data = await getDashboardData(since, sinceDate);
-  } catch {
+  } catch (error) {
+    dashboardError = error;
     data = null;
   }
 
   if (!data) {
+    const isMissingPostgresUrl =
+      dashboardError instanceof Error &&
+      dashboardError.message.includes("POSTGRES_URL");
+
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Översikt</h1>
-        <BackendUnavailable />
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <p className="text-[0.72rem] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+            Översikt
+          </p>
+          <h1 className="text-[2.2rem] font-semibold tracking-[-0.045em] text-foreground md:text-[2.65rem]">
+            Översikten gick inte att ladda.
+          </h1>
+          <p className="max-w-2xl text-[0.98rem] leading-7 text-muted-foreground">
+            Veckobilden och senaste importerna hämtas direkt från din
+            Postgres-databas i den här installationen.
+          </p>
+        </div>
+        <BackendUnavailable
+          reason={isMissingPostgresUrl ? "configuration" : "database"}
+        />
       </div>
     );
   }
@@ -142,15 +161,15 @@ export default async function OverviewPage() {
                 <div className="space-y-3">
                   <Badge
                     variant="secondary"
-                    className="border-white/50 bg-white/70 px-3 py-1 text-[0.7rem] tracking-[0.18em] uppercase"
+                    className="border-white/50 bg-white/70 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.14em] uppercase"
                   >
                     Dagens överblick
                   </Badge>
                   <div className="space-y-2">
-                    <h1 className="text-3xl font-semibold tracking-tight md:text-[2.6rem]">
+                    <h1 className="text-[2.45rem] font-semibold tracking-[-0.05em] text-balance md:text-[3.05rem]">
                       Översikt först. Nästa steg tydligt.
                     </h1>
-                    <p className="max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                    <p className="max-w-2xl text-[0.98rem] leading-7 text-muted-foreground md:text-[1.04rem]">
                       Formkurvan samlar veckan, återhämtningen och vad du bör
                       göra härnäst i en vy som går att läsa på några sekunder.
                     </p>
@@ -172,10 +191,10 @@ export default async function OverviewPage() {
                 <div className="rounded-[1.8rem] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(242,246,255,0.72))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_16px_40px_rgba(77,95,135,0.12)] md:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">
+                      <p className="text-[0.95rem] font-medium tracking-[-0.01em] text-muted-foreground">
                         Nästa steg
                       </p>
-                      <h2 className="max-w-xl text-2xl font-semibold tracking-tight md:text-3xl">
+                      <h2 className="max-w-xl text-[2rem] font-semibold tracking-[-0.045em] md:text-[2.35rem]">
                         {dashboard.action.label}
                       </h2>
                     </div>
@@ -183,7 +202,7 @@ export default async function OverviewPage() {
                       <Sparkles className="size-5" />
                     </span>
                   </div>
-                  <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                  <p className="mt-4 max-w-2xl text-[0.98rem] leading-7 text-muted-foreground md:text-[1.02rem]">
                     {dashboard.action.reason}
                   </p>
                   <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -209,13 +228,13 @@ export default async function OverviewPage() {
                       key={metric.label}
                       className="glass-panel-soft ambient-divider rounded-[1.6rem] border p-4"
                     >
-                      <p className="text-sm font-medium text-muted-foreground">
+                      <p className="text-[0.94rem] font-medium tracking-[-0.01em] text-muted-foreground">
                         {metric.label}
                       </p>
-                      <p className="mt-3 text-2xl font-semibold tracking-tight">
+                      <p className="mt-3 text-[1.85rem] font-semibold tracking-[-0.04em]">
                         {metric.value}
                       </p>
-                      <p className="mt-2 text-sm leading-5 text-muted-foreground">
+                      <p className="mt-2 text-[0.94rem] leading-6 text-muted-foreground">
                         {metric.detail}
                       </p>
                     </div>
@@ -244,7 +263,7 @@ export default async function OverviewPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm leading-6 text-muted-foreground">
+              <p className="text-[0.96rem] leading-7 text-muted-foreground">
                 {recommendation
                   ? `Just nu pekar rekommendationen mot “${recommendation.actionSv}”. Öppna Coach för att få resonemanget i dialogform.`
                   : "Coach använder samma tränings- och återhämtningsbild som översikten, men låter dig ställa en egen fråga direkt."}
@@ -361,7 +380,7 @@ export default async function OverviewPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {data.data_imports.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[0.95rem] text-muted-foreground">
                   Inga inhämtningar ännu.
                 </p>
               ) : (

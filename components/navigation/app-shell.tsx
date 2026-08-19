@@ -64,7 +64,7 @@ function NavSection({
 
   return (
     <div className="space-y-3">
-      <p className="px-2 text-[0.7rem] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+      <p className="px-2 text-[0.68rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
         {title}
       </p>
       <nav className="flex flex-col gap-1.5">
@@ -74,7 +74,7 @@ function NavSection({
             href={link.href}
             onClick={onNavigate}
             className={cn(
-              "group flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-sm transition-all",
+              "group flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-[0.95rem] transition-all",
               pathname === link.href || pathname.startsWith(`${link.href}/`)
                 ? "glass-panel-soft ambient-divider border-white/60 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_10px_28px_rgba(72,87,120,0.12)]"
                 : "border-transparent text-muted-foreground hover:bg-white/50 hover:text-foreground",
@@ -97,10 +97,10 @@ function NavSection({
               >
                 <link.icon className="size-4" />
               </span>
-              <span className="font-medium">{link.label}</span>
+              <span className="font-medium tracking-[-0.015em]">{link.label}</span>
             </span>
             {link.featured ? (
-              <span className="rounded-full bg-primary/10 px-2 py-1 text-[0.68rem] font-semibold text-primary">
+              <span className="rounded-full bg-primary/10 px-2 py-1 text-[0.66rem] font-semibold tracking-[0.02em] text-primary">
                 Ny
               </span>
             ) : null}
@@ -123,10 +123,10 @@ export function AppShell({
       <header className="sticky top-0 z-30 border-b border-white/35 bg-white/45 backdrop-blur-2xl md:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="min-w-0">
-            <Link href="/overview" className="font-semibold tracking-[-0.03em]">
+            <Link href="/overview" className="font-semibold tracking-[-0.045em]">
               Formkurvan
             </Link>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-[0.8rem] text-muted-foreground">
               Dagens översikt först
             </p>
           </div>
@@ -147,16 +147,16 @@ export function AppShell({
             >
               <SheetHeader className="px-6 pb-2 pt-6">
                 <SheetTitle>Meny</SheetTitle>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[0.95rem] leading-6 text-muted-foreground">
                   Håll koll, logga snabbt och hoppa direkt till Coach.
                 </p>
               </SheetHeader>
               <div className="flex flex-1 flex-col gap-6 px-6 pb-6">
                 <div className="glass-panel-soft ambient-divider rounded-[1.6rem] border p-4">
-                  <p className="text-sm font-medium text-foreground">
+                  <p className="text-[0.98rem] font-medium tracking-[-0.015em] text-foreground">
                     {displayName}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-[0.95rem] leading-6 text-muted-foreground">
                     Ett steg fram, en vy i taget.
                   </p>
                 </div>
@@ -178,11 +178,11 @@ export function AppShell({
               <div className="space-y-2">
                 <Link
                   href="/overview"
-                  className="block text-[1.35rem] font-semibold tracking-[-0.04em]"
+                  className="block text-[1.5rem] font-semibold tracking-[-0.055em]"
                 >
                   Formkurvan
                 </Link>
-                <p className="max-w-[16rem] text-sm leading-6 text-muted-foreground">
+                <p className="max-w-[16rem] text-[0.98rem] leading-7 text-muted-foreground">
                   Dagens träningsbild, återhämtning och nästa steg i en lugn,
                   snabbskannad vy.
                 </p>
@@ -195,10 +195,10 @@ export function AppShell({
                   <MessageCircleHeart className="size-5" />
                 </span>
                 <span className="space-y-1">
-                  <span className="block text-sm font-semibold text-foreground">
+                  <span className="block text-[0.98rem] font-semibold tracking-[-0.02em] text-foreground">
                     Öppna Coach
                   </span>
-                  <span className="block text-sm leading-5 text-muted-foreground">
+                  <span className="block text-[0.95rem] leading-6 text-muted-foreground">
                     Fråga direkt utifrån senaste pass, återhämtning och mål.
                   </span>
                 </span>
@@ -212,10 +212,10 @@ export function AppShell({
 
             <div className="mt-auto space-y-3 rounded-[1.6rem] border border-white/45 bg-white/45 p-4">
               <div>
-                <p className="truncate text-sm font-medium text-foreground">
+                <p className="truncate text-[0.98rem] font-medium tracking-[-0.015em] text-foreground">
                   {displayName}
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[0.95rem] leading-6 text-muted-foreground">
                   Kontinuitet slår intensitet.
                 </p>
               </div>
