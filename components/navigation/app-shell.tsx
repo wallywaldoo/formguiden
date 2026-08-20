@@ -174,7 +174,7 @@ export function AppShell({
         }}
         aria-label="Huvudmeny"
       >
-        <div className="grid grid-cols-5 px-1 pt-1">
+        <div className="flex w-full flex-row flex-nowrap items-stretch px-1 pt-2">
           {tabLinks.map((link) => {
             const active = pathMatches(pathname, link.href);
             return (
@@ -182,16 +182,16 @@ export function AppShell({
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[0.62rem] font-medium",
+                  "flex min-h-16 min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[0.78rem] font-medium",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 <link.icon
-                  className="size-5"
+                  className="size-7"
                   strokeWidth={active ? 2.3 : 2}
                   aria-hidden
                 />
-                {link.label}
+                <span className="max-w-full truncate">{link.label}</span>
               </Link>
             );
           })}
@@ -201,12 +201,12 @@ export function AppShell({
             aria-expanded={moreOpen}
             aria-label="Öppna fler sidor"
             className={cn(
-              "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[0.62rem] font-medium",
+              "flex min-h-16 min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[0.78rem] font-medium",
               moreActive || moreOpen ? "text-primary" : "text-muted-foreground",
             )}
           >
             <Ellipsis
-              className="size-5"
+              className="size-7"
               strokeWidth={moreActive || moreOpen ? 2.3 : 2}
               aria-hidden
             />

@@ -19,7 +19,7 @@ export function DistanceRangeChart({
       value={range}
       onValueChange={(value) => setRange(value as "7" | "28" | "90" | "all")}
     >
-      <TabsList className="h-auto w-full max-w-full flex-wrap justify-start">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="7" className="min-h-10">
           7d
         </TabsTrigger>

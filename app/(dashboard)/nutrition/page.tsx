@@ -159,11 +159,11 @@ export default async function NutritionPage({
       <h1 className="page-title">Kost</h1>
 
       <Tabs defaultValue={tab === "hydration" ? "hydration" : "food"}>
-        <TabsList className="grid h-auto w-full grid-cols-2 bg-white/45">
-          <TabsTrigger value="food" className="min-h-10">
+        <TabsList className="flex h-11 w-full flex-row flex-nowrap gap-1 rounded-2xl border border-white/45 bg-white/45 p-1 shadow-none">
+          <TabsTrigger value="food" className="h-full min-h-0 flex-1">
             Mat
           </TabsTrigger>
-          <TabsTrigger value="hydration" className="min-h-10">
+          <TabsTrigger value="hydration" className="h-full min-h-0 flex-1">
             Vätska
           </TabsTrigger>
         </TabsList>

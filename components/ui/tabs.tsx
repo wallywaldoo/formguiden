@@ -26,7 +26,7 @@ function Tabs({
 }
 
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-2xl border border-white/45 bg-white/56 p-[4px] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] group-data-[orientation=horizontal]/tabs:h-11 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
+  "group/tabs-list flex h-11 w-full flex-row flex-nowrap items-center justify-center rounded-2xl border border-white/45 bg-white/56 p-[4px] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
   {
     variants: {
       variant: {
