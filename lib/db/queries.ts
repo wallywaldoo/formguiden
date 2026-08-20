@@ -641,8 +641,8 @@ export async function getGoalsPageData(since: string) {
       avg_pace_s_per_km: unknown;
       avg_heart_rate_bpm: unknown;
     }>,
-    latest_mass_kg: (measurements[0] as { mass_kg?: unknown } | undefined)
-      ?.mass_kg ?? null,
+    latest_mass_kg:
+      (measurements[0] as { mass_kg?: unknown } | undefined)?.mass_kg ?? null,
     strength_sessions: strength as unknown as Array<{ started_at: string }>,
   };
 }
@@ -824,6 +824,53 @@ export async function upsertWeekRecap(recap: {
       headline = EXCLUDED.headline,
       summary = EXCLUDED.summary,
       dimensions = EXCLUDED.dimensions,
+      generated_at = now(),
+      updated_at = now()
+  `;
+}
+
+export async function getActivityRecap(activityId: string) {
+  const rows = await sql`
+    SELECT activity_id, fingerprint, payload, source, model
+    FROM activity_recaps
+    WHERE activity_id = ${activityId}
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return row as unknown as {
+    activity_id: string;
+    fingerprint: string;
+    payload: unknown;
+    source: string;
+    model: string | null;
+  };
+}
+
+export async function upsertActivityRecap(recap: {
+  activityId: string;
+  fingerprint: string;
+  payload: unknown;
+  source: "rules" | "stub" | "openai";
+  model: string | null;
+}) {
+  await sql`
+    INSERT INTO activity_recaps
+      (activity_id, fingerprint, payload, source, model, generated_at)
+    VALUES (
+      ${recap.activityId},
+      ${recap.fingerprint},
+      ${sql.json(recap.payload as never)},
+      ${recap.source},
+      ${recap.model},
+      now()
+    )
+    ON CONFLICT (activity_id)
+    DO UPDATE SET
+      fingerprint = EXCLUDED.fingerprint,
+      payload = EXCLUDED.payload,
+      source = EXCLUDED.source,
+      model = EXCLUDED.model,
       generated_at = now(),
       updated_at = now()
   `;

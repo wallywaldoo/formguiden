@@ -1,3 +1,4 @@
+import { ActivityRecapSlot } from "@/features/activities/activity-recap-slot";
 import { CoachChat } from "@/features/assistant/coach-chat";
 import { BackendUnavailable } from "@/features/dashboard/backend-unavailable";
 import { DataEmptyState } from "@/features/dashboard/data-empty-state";
@@ -32,6 +33,7 @@ import {
   isoWeekStart,
   inInclusiveRange,
 } from "@/lib/analytics/dates";
+import { plannedSessionForDate } from "@/lib/analytics/activity-recap";
 import {
   dailyDistanceSeries,
   historyDistanceSeries,
@@ -269,8 +271,7 @@ export default async function OverviewPage() {
         latestHealth?.bodyBatteryHigh != null
           ? `${Math.round(latestHealth.bodyBatteryHigh)}`
           : "—",
-      detail:
-        latestHealth?.bodyBatteryHigh != null ? "Dagens topp" : "saknas",
+      detail: latestHealth?.bodyBatteryHigh != null ? "Dagens topp" : "saknas",
       href: "/recovery",
     },
     {
@@ -296,6 +297,14 @@ export default async function OverviewPage() {
   });
   const coachWelcome = `${cue.label}. ${cue.reason}`;
 
+  const latestToday = todayActivities[0] ?? null;
+  const latestActivityHref =
+    latestToday == null
+      ? undefined
+      : latestToday.activityType === "strength"
+        ? "/strength"
+        : `/running/${latestToday.id}`;
+
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -314,7 +323,10 @@ export default async function OverviewPage() {
         />
       </section>
 
-      <OverviewTodayPlan today={trainingPlans?.today ?? null}>
+      <OverviewTodayPlan
+        today={trainingPlans?.today ?? null}
+        completed={todayActivities.length > 0}
+      >
         <OverviewDaily
           embedded
           energy={energy}
@@ -326,9 +338,27 @@ export default async function OverviewPage() {
         />
         <OverviewTodayActivity
           embedded
+          completed
           activities={todayActivities}
           distanceUnit={distanceUnit}
         />
+        {latestToday ? (
+          <ActivityRecapSlot
+            activityId={latestToday.id}
+            planned={plannedSessionForDate(trainingPlans?.week, today)}
+            href={latestActivityHref}
+            recentRuns={activities
+              .filter((row) => row.id !== latestToday.id)
+              .map((row) => ({
+                id: row.id,
+                startedAt: row.startedAt,
+                distanceM: row.distanceM,
+                durationS: row.durationS,
+                paceSPerKm: row.avgPaceSPerKm,
+                avgHeartRateBpm: row.avgHeartRateBpm,
+              }))}
+          />
+        ) : null}
       </OverviewTodayPlan>
 
       <OverviewWeek

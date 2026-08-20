@@ -2,11 +2,8 @@ import sql from "@/lib/db";
 import { GarminClient } from "@/lib/garmin/client";
 import { parseFit } from "@/lib/import/fit/parse";
 import { derivedPace } from "@/lib/import/normalize";
-import type {
-  CanonicalActivitySample,
-  CanonicalLap,
-  CanonicalTrackpoint,
-} from "@/lib/import/types";
+import type { CanonicalLap } from "@/lib/import/types";
+import { parseGarminInstant } from "@/lib/garmin/time";
 import { toFiniteNumber } from "@/lib/numbers";
 
 import {
@@ -51,15 +48,21 @@ export async function hydrateGarminActivityDetail(options: {
   const client = options.client ?? GarminClient.fromEnv();
   const warnings: Array<{ code: string; message: string }> = [];
 
-  const [summaryResult, detailsResult, splitsResult, zonesResult, weatherResult, fitResult] =
-    await Promise.allSettled([
-      client.getActivitySummary(options.externalId),
-      client.getActivityDetails(options.externalId),
-      client.getActivitySplits(options.externalId),
-      client.getActivityHrZones(options.externalId),
-      client.getActivityWeather(options.externalId),
-      client.downloadActivityFit(options.externalId),
-    ]);
+  const [
+    summaryResult,
+    detailsResult,
+    splitsResult,
+    zonesResult,
+    weatherResult,
+    fitResult,
+  ] = await Promise.allSettled([
+    client.getActivitySummary(options.externalId),
+    client.getActivityDetails(options.externalId),
+    client.getActivitySplits(options.externalId),
+    client.getActivityHrZones(options.externalId),
+    client.getActivityWeather(options.externalId),
+    client.downloadActivityFit(options.externalId),
+  ]);
 
   for (const [code, result] of [
     ["garmin_summary", summaryResult],
@@ -92,18 +95,24 @@ export async function hydrateGarminActivityDetail(options: {
   }
 
   const startedAt =
-    strFromUnknown(summaryRaw, "startTimeGMT") ??
-    strFromUnknown(summaryRaw, "startTimeLocal") ??
-    fitActivity?.startedAt ??
+    parseGarminInstant(strFromUnknown(summaryRaw, "startTimeGMT")) ??
+    parseGarminInstant(strFromUnknown(summaryRaw, "startTimeLocal")) ??
+    parseGarminInstant(fitActivity?.startedAt) ??
     null;
 
   const polyline = parseGarminPolyline(detailsRaw, startedAt);
-  const trackpoints: CanonicalTrackpoint[] =
-    polyline.length > 1 ? polyline : (fitActivity?.trackpoints ?? []);
-  const samples: CanonicalActivitySample[] = fitActivity?.samples ?? [];
+  const trackpoints = withTimestamps(
+    polyline.length > 1 ? polyline : (fitActivity?.trackpoints ?? []),
+    "pointIndex",
+  );
+  const samples = withTimestamps(fitActivity?.samples ?? [], "sampleIndex");
   const splitLaps = parseGarminSplits(settledValue(splitsResult));
-  const laps: CanonicalLap[] =
-    splitLaps.length > 0 ? splitLaps : (fitActivity?.laps ?? []);
+  const laps: CanonicalLap[] = (
+    splitLaps.length > 0 ? splitLaps : (fitActivity?.laps ?? [])
+  ).map((lap) => ({
+    ...lap,
+    startedAt: parseGarminInstant(lap.startedAt),
+  }));
 
   const hasAnything =
     Boolean(parsedSummary.name) ||
@@ -118,9 +127,7 @@ export async function hydrateGarminActivityDetail(options: {
   }
 
   const distanceM =
-    numFromUnknown(summaryRaw, "distance") ??
-    fitActivity?.distanceM ??
-    null;
+    numFromUnknown(summaryRaw, "distance") ?? fitActivity?.distanceM ?? null;
   const durationS = Math.round(
     payload.movingDurationS ??
       payload.elapsedDurationS ??
@@ -163,10 +170,12 @@ export async function hydrateGarminActivityDetail(options: {
     await tx`
       UPDATE activities
       SET
-        ended_at = COALESCE(${fitActivity?.endedAt ?? null}, ended_at),
+        ended_at = COALESCE(${parseGarminInstant(fitActivity?.endedAt) ?? null}, ended_at),
         duration_s = COALESCE(${durationS || null}, duration_s),
         duration_kind = COALESCE(${
-          payload.movingDurationS != null ? "moving" : fitActivity?.durationKind ?? null
+          payload.movingDurationS != null
+            ? "moving"
+            : (fitActivity?.durationKind ?? null)
         }, duration_kind),
         distance_m = COALESCE(${distanceM}, distance_m),
         elevation_gain_m = COALESCE(${elevationGain}, elevation_gain_m),
@@ -296,6 +305,23 @@ export async function hydrateGarminActivityDetail(options: {
     samples: samples.length,
     warnings,
   };
+}
+
+function withTimestamps<T extends { recordedAt: string }>(
+  rows: T[],
+  indexKey: "pointIndex" | "sampleIndex",
+): T[] {
+  const kept: T[] = [];
+  for (const row of rows) {
+    const recordedAt = parseGarminInstant(row.recordedAt);
+    if (!recordedAt) continue;
+    kept.push({
+      ...row,
+      recordedAt,
+      [indexKey]: kept.length + 1,
+    });
+  }
+  return kept;
 }
 
 function chunkRows<T>(items: T[], size: number): T[][] {

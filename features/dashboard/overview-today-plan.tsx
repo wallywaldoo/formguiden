@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, type ComponentType, type ReactNode } from "react";
-import { Dumbbell, Footprints, HeartPulse, RefreshCw } from "lucide-react";
+import { useActionState, type ReactNode } from "react";
+import {
+  Check,
+  Dumbbell,
+  Footprints,
+  HeartPulse,
+  RefreshCw,
+} from "lucide-react";
 
 import { CollapsiblePanel } from "@/components/dashboard/collapsible-panel";
 import { Button } from "@/components/ui/button";
@@ -15,29 +21,38 @@ import {
   type DailySession,
 } from "@/lib/training-plan/schema";
 
-function iconForKind(kind: DailySession["kind"]): ComponentType<{ className?: string }> {
+function SessionKindIcon({
+  kind,
+  className,
+}: {
+  kind: DailySession["kind"];
+  className?: string;
+}) {
   switch (kind) {
     case "strength":
-      return Dumbbell;
+      return <Dumbbell className={className} />;
     case "active_recovery":
     case "rest":
-      return HeartPulse;
+      return <HeartPulse className={className} />;
     default:
-      return Footprints;
+      return <Footprints className={className} />;
   }
 }
 
 export function OverviewTodayPlan({
   today,
+  completed = false,
   children,
 }: {
   today: DailySession | null;
+  completed?: boolean;
   children?: ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(
     regenerateTrainingPlanAction,
     {},
   );
+  const dayDone = completed || today?.title === "Klar för dagen";
   const meta = today
     ? [
         TRAINING_KIND_LABEL[today.kind],
@@ -47,17 +62,24 @@ export function OverviewTodayPlan({
         .filter(Boolean)
         .join(" · ")
     : "";
-  const CtaIcon = today ? iconForKind(today.kind) : Footprints;
 
   return (
     <CollapsiblePanel
       storageKey="fk:collapse:today"
       title="Idag"
+      actions={
+        dayDone ? (
+          <span className="mr-0.5 flex items-center gap-1 text-[0.75rem] font-medium text-muted-foreground">
+            <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+            Klart
+          </span>
+        ) : null
+      }
       bodyClassName="space-y-5 px-5 py-4"
     >
       {children}
 
-      {today ? (
+      {dayDone ? null : today ? (
         <div className="surface-soft space-y-3 px-4 py-3.5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -67,7 +89,9 @@ export function OverviewTodayPlan({
               <p className="mt-1 text-[1.05rem] font-semibold tracking-[-0.02em]">
                 {today.title}
               </p>
-              <p className="mt-0.5 text-[0.78rem] text-muted-foreground">{meta}</p>
+              <p className="mt-0.5 text-[0.78rem] text-muted-foreground">
+                {meta}
+              </p>
             </div>
             <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0">
               <Button
@@ -77,7 +101,7 @@ export function OverviewTodayPlan({
                 className="h-9 min-h-9 rounded-full px-3 text-[0.78rem] shadow-none md:h-7 md:min-h-7 md:px-2.5 md:text-[0.75rem]"
               >
                 <Link href={hrefForKind(today.kind)}>
-                  <CtaIcon className="size-3.5" />
+                  <SessionKindIcon kind={today.kind} className="size-3.5" />
                   {ctaForKind(today.kind)}
                 </Link>
               </Button>

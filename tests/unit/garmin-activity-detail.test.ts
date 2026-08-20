@@ -13,6 +13,8 @@ import {
   parseGarminSummary,
   parseGarminWeather,
 } from "@/lib/garmin/payload";
+import { parseGarminInstant } from "@/lib/garmin/time";
+import { toIso } from "@/lib/import/normalize";
 
 describe("garmin geo helpers", () => {
   it("keeps degree coordinates and converts FIT semicircles", () => {
@@ -106,5 +108,38 @@ describe("garmin activity parsers", () => {
     expect(points).toHaveLength(2);
     expect(points[0]?.latitude).toBeCloseTo(57.71);
     expect(points[1]?.recordedAt).toBe("2026-08-17T16:25:56.000Z");
+  });
+
+  it("reads Garmin polyline epoch milliseconds instead of treating them as offsets", () => {
+    const startMs = Date.parse("2026-08-17T16:25:26.000Z");
+    const points = parseGarminPolyline(
+      {
+        geoPolylineDTO: {
+          polyline: [
+            { lat: 57.71, lon: 11.97, time: startMs },
+            { lat: 57.72, lon: 11.98, time: startMs + 30_000 },
+          ],
+        },
+      },
+      "2026-08-17 16:25:26.0",
+    );
+    expect(points).toHaveLength(2);
+    expect(points[0]?.recordedAt).toBe("2026-08-17T16:25:26.000Z");
+    expect(points[1]?.recordedAt).toBe("2026-08-17T16:25:56.000Z");
+    expect(points[0]?.recordedAt.startsWith("+")).toBe(false);
+  });
+});
+
+describe("garmin timestamps", () => {
+  it("parses Garmin GMT strings without a timezone suffix", () => {
+    expect(parseGarminInstant("2026-08-17 16:25:26.0")).toBe(
+      "2026-08-17T16:25:26.000Z",
+    );
+  });
+
+  it("drops timestamps that would overflow Postgres", () => {
+    const epochMs = Date.parse("2026-08-17T16:25:26.000Z");
+    expect(toIso(epochMs * 1000)).toBeNull();
+    expect(parseGarminInstant("+058662-03-29T13:01:03.000Z")).toBeNull();
   });
 });

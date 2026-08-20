@@ -4,6 +4,8 @@ import {
   applyTodayCaps,
   fallbackToday,
   fallbackWeek,
+  restorePlannedSession,
+  restorePlannedWeek,
 } from "@/lib/training-plan/fallback";
 import {
   dailySessionSchema,
@@ -113,9 +115,17 @@ async function generatePlans(snapshot: TrainingSnapshot): Promise<{
     const todayRaw = week.days.find(
       (day) => day.localDate === snapshot.localDate,
     );
-    const today = applyTodayCaps(todayRaw ?? fallbackToday(snapshot), snapshot);
+    const plannedDay =
+      restorePlannedSession(todayRaw, snapshot.localDate, snapshot) ??
+      fallbackWeek(snapshot).days.find(
+        (day) => day.localDate === snapshot.localDate,
+      );
+    const today = applyTodayCaps(
+      plannedDay ?? fallbackToday(snapshot),
+      snapshot,
+    );
     const days = week.days.map((day) =>
-      day.localDate === snapshot.localDate ? today : day,
+      day.localDate === snapshot.localDate ? (plannedDay ?? day) : day,
     );
     return {
       today,
@@ -154,6 +164,25 @@ export async function ensureTrainingPlans(input?: {
       feedback: storedFeedback,
     });
     const fingerprint = snapshotFingerprint(snapshot);
+
+    if (!input?.force && snapshot.alreadyTrainedToday && existing.daily) {
+      const today = dailySessionSchema.safeParse(existing.daily.payload);
+      const week = existing.week
+        ? weekPlanSchema.safeParse(existing.week.payload)
+        : ({ success: false } as const);
+      if (today.success) {
+        return {
+          today: applyTodayCaps(today.data, snapshot),
+          week: week.success
+            ? restorePlannedWeek(week.data, snapshot)
+            : fallbackWeek(snapshot),
+          source: existing.daily.source as StoredTrainingPlans["source"],
+          model: existing.daily.model,
+          generatedAt: existing.daily.generated_at,
+          feedback: existing.daily.feedback,
+        };
+      }
+    }
 
     if (
       !input?.force &&

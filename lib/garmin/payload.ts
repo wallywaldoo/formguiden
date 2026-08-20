@@ -2,7 +2,15 @@ import { toFiniteNumber } from "@/lib/numbers";
 import { derivedPace } from "@/lib/import/normalize";
 import type { CanonicalLap, CanonicalTrackpoint } from "@/lib/import/types";
 
-import { toLatitude, toLongitude, weatherTempToCelsius } from "./geo";
+import {
+  parseGarminInstant,
+  recordedAtFromGarminPoint,
+} from "@/lib/garmin/time";
+import {
+  toLatitude,
+  toLongitude,
+  weatherTempToCelsius,
+} from "@/lib/garmin/geo";
 
 export const GARMIN_DETAIL_VERSION = 2;
 
@@ -53,7 +61,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function num(record: Record<string, unknown> | null, ...keys: string[]): number | null {
+function num(
+  record: Record<string, unknown> | null,
+  ...keys: string[]
+): number | null {
   if (!record) return null;
   for (const key of keys) {
     const parsed = toFiniteNumber(record[key]);
@@ -62,7 +73,10 @@ function num(record: Record<string, unknown> | null, ...keys: string[]): number 
   return null;
 }
 
-function str(record: Record<string, unknown> | null, ...keys: string[]): string | null {
+function str(
+  record: Record<string, unknown> | null,
+  ...keys: string[]
+): string | null {
   if (!record) return null;
   for (const key of keys) {
     const value = record[key];
@@ -78,20 +92,26 @@ export function unwrapGarminActivity(raw: unknown): Record<string, unknown> {
   return summary ? { ...root, ...summary } : root;
 }
 
-export function parseGarminSummary(raw: unknown): Partial<GarminActivityPayload> {
+export function parseGarminSummary(
+  raw: unknown,
+): Partial<GarminActivityPayload> {
   const activity = unwrapGarminActivity(raw);
   return {
     name: str(activity, "activityName", "name"),
-    eventType: str(
-      asRecord(activity.eventTypeDTO) ?? asRecord(activity.eventType),
-      "typeKey",
-      "key",
-    ) ?? str(activity, "eventType"),
-    deviceManufacturer: str(
-      asRecord(activity.deviceMetaDataDTO),
-      "manufacturer",
-    ) ?? str(activity, "deviceManufacturer", "manufacturer"),
-    elapsedDurationS: num(activity, "elapsedDuration", "elapsedDurationSeconds"),
+    eventType:
+      str(
+        asRecord(activity.eventTypeDTO) ?? asRecord(activity.eventType),
+        "typeKey",
+        "key",
+      ) ?? str(activity, "eventType"),
+    deviceManufacturer:
+      str(asRecord(activity.deviceMetaDataDTO), "manufacturer") ??
+      str(activity, "deviceManufacturer", "manufacturer"),
+    elapsedDurationS: num(
+      activity,
+      "elapsedDuration",
+      "elapsedDurationSeconds",
+    ),
     movingDurationS: num(activity, "movingDuration", "movingDurationSeconds"),
     avgSpeedMps: num(activity, "averageSpeed", "avgSpeed", "avgSpeedMps"),
     maxSpeedMps: num(activity, "maxSpeed", "maxSpeedMps"),
@@ -129,8 +149,10 @@ export function parseGarminHrZones(raw: unknown): GarminHrZone[] {
 export function parseGarminWeather(raw: unknown): GarminWeather | null {
   const root = asRecord(raw);
   if (!root) return null;
-  const weather = asRecord(root.weatherDto) ?? asRecord(root.weatherDTO) ?? root;
-  const type = asRecord(weather.weatherTypeDTO) ?? asRecord(weather.weatherType);
+  const weather =
+    asRecord(root.weatherDto) ?? asRecord(root.weatherDTO) ?? root;
+  const type =
+    asRecord(weather.weatherTypeDTO) ?? asRecord(weather.weatherType);
   const temperature = num(weather, "temp", "temperature");
   const apparent = num(weather, "apparentTemp", "apparentTemperature");
   const unit = str(weather, "temperatureUnit", "tempUnit", "unit");
@@ -146,11 +168,17 @@ export function parseGarminWeather(raw: unknown): GarminWeather | null {
       temperature == null ? null : weatherTempToCelsius(temperature, unit),
     apparentTemperatureC:
       apparent == null ? null : weatherTempToCelsius(apparent, unit),
-    humidityPercent: num(weather, "relativeHumidity", "humidity", "humidityPercent"),
+    humidityPercent: num(
+      weather,
+      "relativeHumidity",
+      "humidity",
+      "humidityPercent",
+    ),
     windSpeed: num(weather, "windSpeed"),
     windSpeedUnit: str(weather, "windSpeedUnit") ?? "km/h",
     windDirectionCompass: str(weather, "windDirectionCompass", "windDirection"),
-    description: str(type, "desc", "description") ?? str(weather, "weatherDescription"),
+    description:
+      str(type, "desc", "description") ?? str(weather, "weatherDescription"),
     stationName: str(weather, "stationName", "weatherStationName"),
   };
 }
@@ -176,7 +204,9 @@ export function parseGarminSplits(raw: unknown): CanonicalLap[] {
     );
     const distanceM = num(record, "distance", "distanceMeters");
     const startedAt =
-      str(record, "startTimeGMT", "startTimeGmt", "startTime") ?? null;
+      parseGarminInstant(
+        str(record, "startTimeGMT", "startTimeGmt", "startTime"),
+      ) ?? null;
     return [
       {
         lapIndex: num(record, "lapIndex", "lapNumber") ?? index + 1,
@@ -214,19 +244,20 @@ export function parseGarminPolyline(
       ? geo.points
       : [];
 
-  const startMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  const startIso = parseGarminInstant(startedAt);
   const trackpoints: CanonicalTrackpoint[] = [];
 
-  for (const [index, point] of points.entries()) {
+  for (const point of points) {
     const record = asRecord(point);
     const latitude = toLatitude(num(record, "lat", "latitude"));
     const longitude = toLongitude(num(record, "lon", "lng", "longitude"));
     if (latitude == null || longitude == null) continue;
-    const offsetS = num(record, "timeOffsetInSeconds", "time");
-    const recordedAt =
-      Number.isFinite(startMs) && offsetS != null
-        ? new Date(startMs + offsetS * 1000).toISOString()
-        : startedAt ?? new Date().toISOString();
+    const recordedAt = recordedAtFromGarminPoint({
+      startedAt: startIso,
+      offsetS: num(record, "timeOffsetInSeconds"),
+      time: num(record, "time", "timestamp"),
+    });
+    if (!recordedAt) continue;
     trackpoints.push({
       pointIndex: trackpoints.length + 1,
       recordedAt,
@@ -240,7 +271,6 @@ export function parseGarminPolyline(
       powerW: num(record, "power"),
       temperatureC: num(record, "temperature"),
     });
-    void index;
   }
 
   return trackpoints;
@@ -286,7 +316,9 @@ export function readGarminPayload(
   return record as unknown as GarminActivityPayload;
 }
 
-export function paceFromSpeedMps(speedMps: number | null | undefined): number | null {
+export function paceFromSpeedMps(
+  speedMps: number | null | undefined,
+): number | null {
   if (speedMps == null || speedMps <= 0) return null;
   return 1000 / speedMps;
 }

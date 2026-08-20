@@ -117,7 +117,7 @@ describe("training plan fallback", () => {
     expect(week.days[6]?.kind).toBe("rest");
   });
 
-  it("clamps a quality session when only recovery is allowed", () => {
+  it("marks the day as done instead of serving the next session", () => {
     const snapshot = buildTrainingSnapshot({
       activities: [run({ id: "today", startedAt: "2026-04-15T07:00:00.000Z" })],
       health: [night("2026-04-15", 8)],
@@ -140,7 +140,28 @@ describe("training plan fallback", () => {
       why: ["Test"],
     };
     const clamped = applyTodayCaps(quality, snapshot);
-    expect(["active_recovery", "rest"]).toContain(clamped.kind);
+    expect(clamped.kind).toBe("rest");
+    expect(clamped.title).toBe("Klar för dagen");
+  });
+
+  it("keeps the week's planned session after a completed day", () => {
+    const snapshot = buildTrainingSnapshot({
+      activities: [run({ id: "today", startedAt: "2026-04-15T07:00:00.000Z" })],
+      health: [night("2026-04-15", 8)],
+      strengthSessions: [],
+      context,
+      weeklyStrengthTarget: 2,
+      pendingImportId: null,
+      distanceUnit: "km",
+      raceType: null,
+      raceDate: null,
+      feedback: null,
+    });
+    const week = fallbackWeek(snapshot);
+    const today = week.days.find((day) => day.localDate === snapshot.localDate);
+    expect(snapshot.alreadyTrainedToday).toBe(true);
+    expect(today?.kind).toBe("strength");
+    expect(today?.title).not.toBe("Klar för dagen");
   });
 });
 

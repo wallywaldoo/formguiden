@@ -675,6 +675,22 @@ CREATE INDEX week_recaps_week_start_idx
   ON public.week_recaps (week_start DESC);
 
 -- ---------------------------------------------------------------------------
+-- Activity coach recaps
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE public.activity_recaps (
+  activity_id uuid PRIMARY KEY REFERENCES public.activities (id) ON DELETE CASCADE,
+  fingerprint text NOT NULL,
+  payload jsonb NOT NULL,
+  source text NOT NULL,
+  model text,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT activity_recaps_source_check CHECK (source IN ('rules', 'stub', 'openai'))
+);
+
+-- ---------------------------------------------------------------------------
 -- Data exports
 -- ---------------------------------------------------------------------------
 
@@ -731,4 +747,6 @@ CREATE TRIGGER set_updated_at_data_export_jobs BEFORE UPDATE ON public.data_expo
 CREATE TRIGGER set_updated_at_training_plans BEFORE UPDATE ON public.training_plans
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_updated_at_week_recaps BEFORE UPDATE ON public.week_recaps
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_updated_at_activity_recaps BEFORE UPDATE ON public.activity_recaps
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();

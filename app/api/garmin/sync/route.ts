@@ -274,9 +274,9 @@ export async function POST(request: Request) {
     await saveMetadata(metadata);
 
     try {
-      const { invalidateTrainingPlans } =
+      const { ensureTrainingPlans } =
         await import("@/features/training-plan/service");
-      await invalidateTrainingPlans();
+      await ensureTrainingPlans();
     } catch {
       // Plan refresh is best-effort after a successful sync.
     }

@@ -313,7 +313,7 @@
 
 @media (max-width: 767px) {
   :root {
-    --app-tabbar: calc(5.35rem + env(safe-area-inset-bottom, 0px));
+    --app-tabbar: calc(4.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   [data-slot="native-select"] {

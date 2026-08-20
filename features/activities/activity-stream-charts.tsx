@@ -26,6 +26,8 @@ type SamplePoint = {
   speedMps: number | null;
   altitudeM: number | null;
   cadence: number | null;
+  powerW?: number | null;
+  temperatureC?: number | null;
 };
 
 function paceSeconds(speedMps: number | null): number | null {
@@ -52,7 +54,12 @@ export function ActivityStreamCharts({ samples }: { samples: SamplePoint[] }) {
     pace: paceSeconds(sample.speedMps),
     altitude: sample.altitudeM,
     cadence: sample.cadence,
+    power: sample.powerW ?? null,
+    temperature: sample.temperatureC ?? null,
   }));
+
+  const hasPower = data.some((row) => row.power != null);
+  const hasTemp = data.some((row) => row.temperature != null);
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
@@ -91,6 +98,28 @@ export function ActivityStreamCharts({ samples }: { samples: SamplePoint[] }) {
         formatter={(value) => (value != null ? `${Math.round(value)} spm` : "—")}
         data={data}
       />
+      {hasPower ? (
+        <ChartCard
+          title="Effekt"
+          description="Watt över passet."
+          dataKey="power"
+          color="var(--color-chart-4)"
+          formatter={(value) => (value != null ? `${Math.round(value)} W` : "—")}
+          data={data}
+        />
+      ) : null}
+      {hasTemp ? (
+        <ChartCard
+          title="Temperatur"
+          description="Kropps- eller omgivningstemperatur i streamen."
+          dataKey="temperature"
+          color="var(--color-chart-1)"
+          formatter={(value) =>
+            value != null ? `${value.toFixed(1)} °C` : "—"
+          }
+          data={data}
+        />
+      ) : null}
     </div>
   );
 }
@@ -106,7 +135,7 @@ function ChartCard({
 }: {
   title: string;
   description: string;
-  dataKey: "heartRate" | "pace" | "altitude" | "cadence";
+  dataKey: "heartRate" | "pace" | "altitude" | "cadence" | "power" | "temperature";
   color: string;
   reversed?: boolean;
   formatter?: (value: number | null) => string;
@@ -116,6 +145,8 @@ function ChartCard({
     pace: number | null;
     altitude: number | null;
     cadence: number | null;
+    power: number | null;
+    temperature: number | null;
   }>;
 }) {
   return (

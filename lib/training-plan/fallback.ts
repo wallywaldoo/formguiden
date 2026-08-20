@@ -1,4 +1,4 @@
-import { addDays } from "@/lib/analytics/dates";
+import { addDays, isoWeekday } from "@/lib/analytics/dates";
 import {
   clampSessionToKinds,
   type DailySession,
@@ -113,11 +113,14 @@ function sessionForKind(
   }
 }
 
-function pickKind(
-  snapshot: TrainingSnapshot,
+function templateKindForWeekday(
+  snapshot: TrainingSnapshot | null,
   weekday: number,
 ): TrainingSessionKind {
   let kind = WEEK_TEMPLATE[weekday - 1] ?? "rest";
+  if (!snapshot || weekday !== snapshot.weekday) {
+    return kind;
+  }
   if (snapshot.preferredKind === "strength" && weekday >= 3 && weekday <= 5) {
     kind = "strength";
   }
@@ -127,13 +130,87 @@ function pickKind(
   ) {
     kind = "easy_run";
   }
+  return kind;
+}
+
+function pickKind(
+  snapshot: TrainingSnapshot,
+  weekday: number,
+): TrainingSessionKind {
+  const kind = templateKindForWeekday(snapshot, weekday);
   if (!snapshot.allowedKinds.includes(kind)) {
-    kind = snapshot.allowedKinds[0] ?? "rest";
+    return snapshot.allowedKinds[0] ?? "rest";
   }
   return kind;
 }
 
+export function templateSessionForDate(
+  localDate: string,
+  snapshot?: TrainingSnapshot | null,
+): DailySession {
+  const kind = templateKindForWeekday(snapshot ?? null, isoWeekday(localDate));
+  const why =
+    snapshot != null && snapshotFacts(snapshot).length > 0
+      ? snapshotFacts(snapshot)
+      : ["Ursprunglig dagsplan."];
+  return sessionForKind(kind, localDate, why);
+}
+
+/** Keep the pre-workout plan when a completed day was rewritten to recovery. */
+export function restorePlannedSession(
+  day: DailySession | null | undefined,
+  localDate: string,
+  snapshot?: TrainingSnapshot | null,
+): DailySession | null {
+  const templated = templateSessionForDate(localDate, snapshot);
+  if (day == null || day.title === "Klar för dagen") {
+    return templated;
+  }
+  if (
+    (day.kind === "rest" || day.kind === "active_recovery") &&
+    templated.kind !== "rest" &&
+    templated.kind !== "active_recovery"
+  ) {
+    return templated;
+  }
+  return day;
+}
+
+export function restorePlannedWeek(
+  week: WeekPlan,
+  snapshot?: TrainingSnapshot | null,
+): WeekPlan {
+  return {
+    ...week,
+    days: week.days.map((day) => {
+      const restored = restorePlannedSession(day, day.localDate, snapshot);
+      return restored ?? day;
+    }),
+  };
+}
+
+export function doneForToday(snapshot: TrainingSnapshot): DailySession {
+  return {
+    localDate: snapshot.localDate,
+    kind: "rest",
+    title: "Klar för dagen",
+    durationMin: 0,
+    intensity: "Ingen mer träning",
+    steps: [
+      "Dagens pass är genomfört.",
+      "Ingen mer strukturerad träning ikväll.",
+      "Morgondagens rekommendation kommer i morgon.",
+    ],
+    why: [
+      snapshot.vetoReason ?? "Du har redan ett pass inne. Låt det sjunka in.",
+    ],
+  };
+}
+
 export function fallbackToday(snapshot: TrainingSnapshot): DailySession {
+  if (snapshot.alreadyTrainedToday) {
+    return doneForToday(snapshot);
+  }
   const why =
     snapshotFacts(snapshot).length > 0
       ? snapshotFacts(snapshot)
@@ -147,10 +224,9 @@ export function fallbackWeek(snapshot: TrainingSnapshot): WeekPlan {
     snapshotFacts(snapshot).length > 0
       ? snapshotFacts(snapshot)
       : ["Veckoplan utifrån mål och senaste data."];
-  const days = WEEK_TEMPLATE.map((templateKind, index) => {
+  const days = WEEK_TEMPLATE.map((_, index) => {
     const localDate = addDays(snapshot.weekStart, index);
-    const isToday = localDate === snapshot.localDate;
-    const kind = isToday ? pickKind(snapshot, snapshot.weekday) : templateKind;
+    const kind = templateKindForWeekday(snapshot, index + 1);
     return sessionForKind(kind, localDate, why);
   });
   return { weekStart: snapshot.weekStart, days };
@@ -160,6 +236,9 @@ export function applyTodayCaps(
   session: DailySession,
   snapshot: TrainingSnapshot,
 ): DailySession {
+  if (snapshot.alreadyTrainedToday) {
+    return doneForToday(snapshot);
+  }
   return clampSessionToKinds(
     session,
     snapshot.allowedKinds,
