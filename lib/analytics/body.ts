@@ -86,3 +86,65 @@ export function massSeries(
     )
     .sort((a, b) => a.date.localeCompare(b.date));
 }
+
+export function bodyFatSeries(
+  points: BodyPoint[],
+  context: AnalyticsContext,
+  days: number,
+): Array<{ date: string; bodyFatPct: number }> {
+  const today = toLocalDate(context.now.toISOString(), context.timeZone);
+  const window = rollingWindow(today, days);
+  return points
+    .map((point) => ({
+      date: toLocalDate(point.measuredAt, context.timeZone),
+      bodyFatPct: point.bodyFatPct,
+    }))
+    .filter(
+      (point): point is { date: string; bodyFatPct: number } =>
+        point.bodyFatPct != null &&
+        point.bodyFatPct > 0 &&
+        inInclusiveRange(point.date, window.start, window.end),
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function bodyMassIndex(
+  massKg: number | null,
+  heightCm: number | null,
+): { value: number; category: string } | null {
+  if (massKg == null || massKg <= 0 || heightCm == null || heightCm <= 0) {
+    return null;
+  }
+  const heightM = heightCm / 100;
+  const value = massKg / (heightM * heightM);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  let category: string;
+  if (value < 18.5) {
+    category = "Undervikt";
+  } else if (value < 25) {
+    category = "Normalvikt";
+  } else if (value < 30) {
+    category = "Övervikt";
+  } else {
+    category = "Fetma";
+  }
+  return { value, category };
+}
+
+export function massGoalProgress(
+  currentKg: number,
+  targetKg: number,
+  startKg: number,
+): number | null {
+  const total = Math.abs(startKg - targetKg);
+  if (total < 0.05) {
+    return currentKg === targetKg ? 100 : null;
+  }
+  const losing = startKg > targetKg;
+  const raw = losing
+    ? (startKg - currentKg) / total
+    : (currentKg - startKg) / total;
+  return Math.max(0, Math.min(100, raw * 100));
+}

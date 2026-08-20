@@ -2,49 +2,81 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType, ReactNode } from "react";
 import {
-  Activity,
-  ArrowUpRight,
+  useEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import {
+  Apple,
+  ArrowUpFromLine,
+  BicepsFlexed,
+  Ellipsis,
   Goal,
   HeartPulse,
-  Menu,
+  LayoutDashboard,
+  LockKeyhole,
   MessageCircleHeart,
-  Settings2,
+  PersonStanding,
   Sparkles,
-  Trophy,
+  Timer,
   UserRound,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { SidebarProfile } from "@/components/navigation/sidebar-profile";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
-import { SignOutButton } from "@/features/auth/sign-out-button";
 import { cn } from "@/lib/utils";
 
 const primaryLinks = [
-  { href: "/overview", label: "Översikt", icon: Activity },
-  { href: "/coach", label: "Coach", icon: MessageCircleHeart, featured: true },
+  { href: "/overview", label: "Översikt", icon: LayoutDashboard },
+  { href: "/coach", label: "Coach", icon: MessageCircleHeart },
   { href: "/report", label: "Veckorapport", icon: Sparkles },
-  { href: "/running", label: "Löpning", icon: Trophy },
+  { href: "/running", label: "Löpning", icon: Timer },
   { href: "/recovery", label: "Återhämtning", icon: HeartPulse },
-  { href: "/import", label: "Efter passet", icon: ArrowUpRight },
+  { href: "/import", label: "Importera", icon: ArrowUpFromLine },
 ];
 
 const secondaryLinks = [
-  { href: "/body", label: "Kropp", icon: UserRound },
-  { href: "/nutrition", label: "Kost", icon: Activity },
-  { href: "/strength", label: "Styrka", icon: Sparkles },
+  { href: "/body", label: "Kropp", icon: PersonStanding },
+  { href: "/nutrition", label: "Kost", icon: Apple },
+  { href: "/strength", label: "Styrka", icon: BicepsFlexed },
   { href: "/goals", label: "Mål", icon: Goal },
-  { href: "/settings/profile", label: "Profil", icon: Settings2 },
-  { href: "/settings/privacy", label: "Integritet", icon: Settings2 },
-  { href: "/settings/integrations", label: "Integrationer", icon: Settings2 },
+  { href: "/settings/profile", label: "Profil", icon: UserRound },
+  { href: "/settings/privacy", label: "Konto", icon: LockKeyhole },
 ];
+
+const tabLinks = [
+  { href: "/overview", label: "Översikt", icon: LayoutDashboard },
+  { href: "/running", label: "Löpning", icon: Timer },
+  { href: "/nutrition", label: "Kost", icon: Apple },
+  { href: "/coach", label: "Coach", icon: MessageCircleHeart },
+] as const;
+
+const moreLinks = [
+  { href: "/report", label: "Veckorapport", icon: Sparkles },
+  { href: "/recovery", label: "Återhämtning", icon: HeartPulse },
+  { href: "/import", label: "Importera", icon: ArrowUpFromLine },
+  { href: "/strength", label: "Styrka", icon: BicepsFlexed },
+  { href: "/body", label: "Kropp", icon: PersonStanding },
+  { href: "/goals", label: "Mål", icon: Goal },
+  { href: "/settings/profile", label: "Profil", icon: UserRound },
+  { href: "/settings/privacy", label: "Konto", icon: LockKeyhole },
+];
+
+function pathMatches(pathname: string, href: string) {
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`) ||
+    (href === "/settings/privacy" &&
+      pathname.startsWith("/settings/integrations"))
+  );
+}
 
 function NavSection({
   title,
@@ -56,56 +88,34 @@ function NavSection({
     href: string;
     label: string;
     icon: ComponentType<{ className?: string }>;
-    featured?: boolean;
   }>;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
 
   return (
-    <div className="space-y-3">
-      <p className="px-2 text-[0.68rem] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-        {title}
-      </p>
-      <nav className="flex flex-col gap-1">
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            onClick={onNavigate}
-            className={cn(
-              "group flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-2.5 text-[0.93rem] transition-all",
-              pathname === link.href || pathname.startsWith(`${link.href}/`)
-                ? "glass-panel-soft ambient-divider border-white/60 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_10px_28px_rgba(72,87,120,0.12)]"
-                : "border-transparent text-muted-foreground hover:bg-white/50 hover:text-foreground",
-              link.featured &&
-                !(
-                  pathname === link.href || pathname.startsWith(`${link.href}/`)
-                )
-                ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(232,240,255,0.72))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_8px_24px_rgba(88,108,155,0.12)]"
-                : null,
-            )}
-          >
-            <span className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "flex size-8.5 items-center justify-center rounded-xl border transition-colors",
-                  pathname === link.href || pathname.startsWith(`${link.href}/`)
-                    ? "border-white/70 bg-white/70 text-primary"
-                    : "border-white/50 bg-white/45 text-muted-foreground group-hover:text-primary",
-                )}
-              >
-                <link.icon className="size-4" />
-              </span>
-              <span className="font-medium tracking-[-0.015em]">{link.label}</span>
-            </span>
-            {link.featured ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-1 text-[0.64rem] font-semibold tracking-[0.02em] text-primary">
-                Ny
-              </span>
-            ) : null}
-          </Link>
-        ))}
+    <div className="space-y-2">
+      <h2 className="panel-title px-0.5">{title}</h2>
+      <nav className="flex flex-col gap-0.5">
+        {links.map((link) => {
+          const active = pathMatches(pathname, link.href);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={onNavigate}
+              className={cn(
+                "flex min-h-11 items-center gap-3 rounded-2xl px-3 py-2 text-[0.88rem] transition-colors md:min-h-0",
+                active
+                  ? "bg-white/70 text-foreground"
+                  : "text-muted-foreground hover:bg-white/45 hover:text-foreground",
+              )}
+            >
+              <link.icon className="size-4 shrink-0" />
+              <span className="font-medium">{link.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );
@@ -114,93 +124,28 @@ function NavSection({
 export function AppShell({
   children,
   displayName,
+  profileSubtitle,
 }: {
   children: ReactNode;
   displayName: string;
+  profileSubtitle?: string;
 }) {
-  return (
-    <div className="min-h-full">
-      <header className="sticky top-0 z-30 border-b border-white/35 bg-white/45 backdrop-blur-2xl md:hidden">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <div className="min-w-0">
-            <Link href="/overview" className="font-semibold tracking-[-0.045em]">
-              Formkurvan
-            </Link>
-            <p className="truncate text-[0.8rem] text-muted-foreground">
-              Dagens översikt först
-            </p>
-          </div>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Öppna meny"
-                className="glass-panel-soft border-white/55 bg-white/55"
-              >
-                <Menu />
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="right"
-              className="glass-nav w-[22rem] border-l border-white/45 bg-transparent"
-            >
-              <SheetHeader className="px-6 pb-2 pt-6">
-                <SheetTitle>Meny</SheetTitle>
-                <p className="text-[0.95rem] leading-6 text-muted-foreground">
-                  Håll koll, logga snabbt och hoppa direkt till Coach.
-                </p>
-              </SheetHeader>
-              <div className="flex flex-1 flex-col gap-6 px-6 pb-6">
-                <div className="glass-panel-soft ambient-divider rounded-[1.6rem] border p-4">
-                  <p className="text-[0.98rem] font-medium tracking-[-0.015em] text-foreground">
-                    {displayName}
-                  </p>
-                  <p className="mt-1 text-[0.95rem] leading-6 text-muted-foreground">
-                    Ett steg fram, en vy i taget.
-                  </p>
-                </div>
-                <NavSection title="Daglig vy" links={primaryLinks} />
-                <NavSection title="Detaljer" links={secondaryLinks} />
-                <div className="mt-auto">
-                  <SignOutButton />
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
+  const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = moreLinks.some((link) => pathMatches(pathname, link.href));
 
-      <div className="mx-auto flex w-full max-w-7xl gap-6 px-3 pb-6 pt-3 md:px-5 md:pt-5">
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
+  return (
+    <div className="min-h-dvh">
+      <div className="mx-auto flex w-full max-w-7xl gap-6 px-3 pb-[calc(var(--app-tabbar)+0.75rem)] pt-[max(0.75rem,env(safe-area-inset-top))] md:px-5 md:pb-6 md:pt-5">
         <aside className="sticky top-5 hidden h-[calc(100svh-2.5rem)] w-[19rem] shrink-0 md:flex">
           <div className="glass-nav ambient-divider flex w-full flex-col rounded-[2rem] border p-4">
-            <div className="space-y-4 p-2">
-              <div className="space-y-1.5">
-                <Link
-                  href="/overview"
-                  className="block text-[1.35rem] font-semibold tracking-[-0.04em]"
-                >
-                  Formkurvan
-                </Link>
-                <p className="max-w-[15rem] text-[0.9rem] leading-6 text-muted-foreground">
-                  Dagens läge, återhämtning och nästa steg i en lugn vy.
-                </p>
-              </div>
-              <Link
-                href="/coach"
-                className="glass-panel-soft ambient-divider flex items-start gap-3 rounded-[1.5rem] border p-4 text-left transition-transform hover:-translate-y-0.5"
-              >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,rgba(111,154,255,0.22),rgba(182,207,255,0.5))] text-primary">
-                  <MessageCircleHeart className="size-5" />
-                </span>
-                <span className="space-y-1">
-                  <span className="block text-[0.95rem] font-semibold tracking-[-0.02em] text-foreground">
-                    Öppna Coach
-                  </span>
-                  <span className="block text-[0.88rem] leading-6 text-muted-foreground">
-                    Få resonemang utifrån senaste pass, återhämtning och mål.
-                  </span>
-                </span>
+            <div className="px-2 pb-3 pt-1">
+              <Link href="/overview" className="page-title block">
+                Formkurvan
               </Link>
             </div>
 
@@ -209,21 +154,105 @@ export function AppShell({
               <NavSection title="Detaljer" links={secondaryLinks} />
             </div>
 
-            <div className="mt-auto space-y-3 rounded-[1.6rem] border border-white/45 bg-white/45 p-4">
-              <div>
-                <p className="truncate text-[0.95rem] font-medium tracking-[-0.015em] text-foreground">
-                  {displayName}
-                </p>
-                <p className="text-[0.88rem] leading-6 text-muted-foreground">
-                  Kontinuitet slår intensitet.
-                </p>
-              </div>
-              <SignOutButton />
+            <div className="mt-auto px-2 pt-3">
+              <SidebarProfile
+                displayName={displayName}
+                subtitle={profileSubtitle}
+              />
             </div>
           </div>
         </aside>
-        <main className="min-w-0 flex-1 pb-10 pt-3 md:pt-4">{children}</main>
+        <main className="min-w-0 flex-1 pb-4 pt-1 md:pb-10 md:pt-4">
+          <div className="page-shell ambient-divider">{children}</div>
+        </main>
       </div>
+
+      <nav
+        className="glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-white/40 md:hidden"
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+        aria-label="Huvudmeny"
+      >
+        <div className="grid grid-cols-5 px-1 pt-1">
+          {tabLinks.map((link) => {
+            const active = pathMatches(pathname, link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[0.62rem] font-medium",
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                <link.icon
+                  className="size-5"
+                  strokeWidth={active ? 2.3 : 2}
+                  aria-hidden
+                />
+                {link.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-expanded={moreOpen}
+            aria-label="Öppna fler sidor"
+            className={cn(
+              "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[0.62rem] font-medium",
+              moreActive || moreOpen ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            <Ellipsis
+              className="size-5"
+              strokeWidth={moreActive || moreOpen ? 2.3 : 2}
+              aria-hidden
+            />
+            Mer
+          </button>
+        </div>
+      </nav>
+
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent
+          side="bottom"
+          className="glass-nav max-h-[min(82dvh,calc(100dvh-var(--app-tabbar)-env(safe-area-inset-top)))] gap-0 rounded-t-[1.6rem] border-white/45 bg-transparent pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
+        >
+          <div className="mx-auto mt-1.5 h-1 w-10 rounded-full bg-foreground/15" />
+          <SheetHeader className="px-5 pb-2 pt-3">
+            <SheetTitle className="page-title">Mer</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 pb-4">
+            <SidebarProfile
+              displayName={displayName}
+              subtitle={profileSubtitle}
+              menuSide="bottom"
+            />
+            <nav className="grid grid-cols-2 gap-2">
+              {moreLinks.map((link) => {
+                const active = pathMatches(pathname, link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "flex min-h-14 items-center gap-3 rounded-2xl border border-white/45 bg-white/45 px-3.5 py-3 text-[0.88rem] transition-colors",
+                      active
+                        ? "bg-white/75 text-foreground"
+                        : "text-foreground hover:bg-white/60",
+                    )}
+                  >
+                    <link.icon className="size-4 shrink-0 text-primary" />
+                    <span className="font-medium">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

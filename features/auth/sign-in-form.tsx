@@ -15,7 +15,7 @@ export function SignInForm({ initialError }: { initialError?: string }) {
   const error = state.error ?? initialError;
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
+    <form action={formAction} className="flex flex-col gap-5">
       {error ? (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -29,11 +29,13 @@ export function SignInForm({ initialError }: { initialError?: string }) {
             name="password"
             type="password"
             autoComplete="current-password"
+            autoFocus
             required
+            className="h-11"
           />
         </Field>
       </FieldGroup>
-      <SubmitButton className="w-full">Logga in</SubmitButton>
+      <SubmitButton className="h-11 w-full">Logga in</SubmitButton>
     </form>
   );
 }

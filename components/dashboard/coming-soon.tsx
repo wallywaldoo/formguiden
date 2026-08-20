@@ -9,7 +9,7 @@ export function ComingSoonPage({
 }) {
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+      <h1 className="page-title">{title}</h1>
       <Card>
         <CardHeader>
           <CardTitle>Inte i den här fasen</CardTitle>

@@ -14,17 +14,5 @@ export default async function CoachPage() {
       "Jag kunde inte läsa all data precis nu, men du kan fortfarande ställa en fråga så försöker jag igen.";
   }
 
-  return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Fråga din coach</h1>
-        <p className="max-w-2xl text-muted-foreground">
-          Ställ en fråga direkt i Formkurvan och få ett svar baserat på dina
-          synkade Garmin-pass, återhämtningssignaler och mål.
-        </p>
-      </div>
-
-      <CoachChat initialSummary={initialSummary} />
-    </div>
-  );
+  return <CoachChat variant="page" initialSummary={initialSummary} />;
 }

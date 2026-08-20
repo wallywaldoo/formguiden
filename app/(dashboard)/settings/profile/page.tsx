@@ -1,3 +1,4 @@
+import { toIsoDate } from "@/lib/analytics/daily-energy";
 import { ProfileSettingsForm } from "@/features/profiles/profile-settings-form";
 import { getProfileSettings } from "@/lib/db/queries";
 import { listTimeZones } from "@/lib/timezones";
@@ -10,14 +11,14 @@ export default async function ProfileSettingsPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Profil</h1>
-        <p className="text-muted-foreground">
-          Namn, tidszon och visningsenheter. Lagrad data är alltid SI.
-        </p>
-      </div>
+      <h1 className="page-title">Profil</h1>
       <ProfileSettingsForm
         displayName={profile?.display_name ?? ""}
+        dateOfBirth={toIsoDate(profile?.date_of_birth) ?? ""}
+        sexAtBirth={profile?.sex_at_birth ?? "unspecified"}
+        heightCm={
+          profile?.height_cm != null ? String(profile.height_cm) : ""
+        }
         timezone={preferences?.timezone ?? "Europe/Stockholm"}
         distanceUnit={preferences?.distance_unit ?? "km"}
         massUnit={preferences?.mass_unit ?? "kg"}

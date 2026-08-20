@@ -21,12 +21,16 @@ CREATE TABLE public.profiles (
   display_name text,
   date_of_birth date,
   sex_at_birth text,
+  height_cm numeric,
   onboarding_completed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT profiles_sex_at_birth_check CHECK (
     sex_at_birth IS NULL
     OR sex_at_birth IN ('female', 'male', 'unspecified')
+  ),
+  CONSTRAINT profiles_height_cm_check CHECK (
+    height_cm IS NULL OR height_cm > 0
   )
 );
 
@@ -227,6 +231,7 @@ CREATE TABLE public.activities (
   perceived_effort numeric,
   notes text,
   provider_payload jsonb,
+  detail_hydrated_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT activities_type_check CHECK (
@@ -255,9 +260,54 @@ CREATE TABLE public.activity_laps (
   avg_pace_s_per_km numeric,
   avg_heart_rate_bpm numeric,
   elevation_gain_m numeric,
+  max_heart_rate_bpm numeric,
+  avg_cadence numeric,
+  elevation_loss_m numeric,
+  calories_kcal numeric,
   CONSTRAINT activity_laps_kind_check CHECK (kind IN ('lap', 'split')),
   CONSTRAINT activity_laps_activity_kind_index_key UNIQUE (activity_id, kind, lap_index)
 );
+
+CREATE TABLE public.activity_trackpoints (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  activity_id uuid NOT NULL REFERENCES public.activities (id) ON DELETE CASCADE,
+  point_index integer NOT NULL,
+  recorded_at timestamptz NOT NULL,
+  latitude double precision NOT NULL,
+  longitude double precision NOT NULL,
+  altitude_m numeric,
+  distance_m numeric,
+  heart_rate_bpm numeric,
+  cadence numeric,
+  speed_mps numeric,
+  power_w numeric,
+  temperature_c numeric,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT activity_trackpoints_activity_point_key UNIQUE (activity_id, point_index)
+);
+
+CREATE INDEX activity_trackpoints_activity_recorded_idx
+  ON public.activity_trackpoints (activity_id, recorded_at ASC);
+
+CREATE TABLE public.activity_samples (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  activity_id uuid NOT NULL REFERENCES public.activities (id) ON DELETE CASCADE,
+  sample_index integer NOT NULL,
+  recorded_at timestamptz NOT NULL,
+  elapsed_s integer,
+  distance_m numeric,
+  heart_rate_bpm numeric,
+  cadence numeric,
+  speed_mps numeric,
+  altitude_m numeric,
+  power_w numeric,
+  temperature_c numeric,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT activity_samples_activity_sample_key UNIQUE (activity_id, sample_index)
+);
+
+CREATE INDEX activity_samples_activity_recorded_idx
+  ON public.activity_samples (activity_id, recorded_at ASC);
 
 -- ---------------------------------------------------------------------------
 -- Health & body
@@ -576,6 +626,55 @@ CREATE INDEX recommendation_signals_recommendation_idx
   ON public.recommendation_signals (recommendation_id);
 
 -- ---------------------------------------------------------------------------
+-- Coaching: daily and weekly training plans
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE public.training_plans (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  plan_type text NOT NULL,
+  local_date date NOT NULL,
+  payload jsonb NOT NULL,
+  rule_caps jsonb NOT NULL DEFAULT '[]'::jsonb,
+  fingerprint text NOT NULL,
+  source text NOT NULL,
+  model text,
+  feedback text,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT training_plans_type_check CHECK (plan_type IN ('daily', 'week')),
+  CONSTRAINT training_plans_source_check CHECK (source IN ('rules', 'stub', 'openai')),
+  CONSTRAINT training_plans_type_date_key UNIQUE (plan_type, local_date)
+);
+
+CREATE INDEX training_plans_generated_idx
+  ON public.training_plans (generated_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Weekly recaps
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE public.week_recaps (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_start date NOT NULL,
+  week_end date NOT NULL,
+  score smallint NOT NULL,
+  medal text NOT NULL,
+  headline text NOT NULL,
+  summary text NOT NULL,
+  dimensions jsonb NOT NULL,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT week_recaps_week_start_key UNIQUE (week_start),
+  CONSTRAINT week_recaps_score_check CHECK (score BETWEEN 1 AND 10),
+  CONSTRAINT week_recaps_medal_check CHECK (medal IN ('gold', 'silver', 'bronze', 'none'))
+);
+
+CREATE INDEX week_recaps_week_start_idx
+  ON public.week_recaps (week_start DESC);
+
+-- ---------------------------------------------------------------------------
 -- Data exports
 -- ---------------------------------------------------------------------------
 
@@ -628,4 +727,8 @@ CREATE TRIGGER set_updated_at_strength_sessions BEFORE UPDATE ON public.strength
 CREATE TRIGGER set_updated_at_strength_sets BEFORE UPDATE ON public.strength_sets
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_updated_at_data_export_jobs BEFORE UPDATE ON public.data_export_jobs
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_updated_at_training_plans BEFORE UPDATE ON public.training_plans
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_updated_at_week_recaps BEFORE UPDATE ON public.week_recaps
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();

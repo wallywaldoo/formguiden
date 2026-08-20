@@ -24,6 +24,7 @@ import {
   estimateNutritionAction,
 } from "@/features/nutrition/actions";
 import { MEAL_TYPE_LABEL } from "@/features/logging/labels";
+import type { MealSuggestion } from "@/features/nutrition/meal-suggestions";
 
 export function NutritionForm({
   timeZone,
@@ -31,12 +32,14 @@ export function NutritionForm({
   massUnit,
   aiEnabled,
   onSuccess,
+  preset,
 }: {
   timeZone: string;
   nowLocal: string;
   massUnit: "kg" | "lb";
   aiEnabled: boolean;
   onSuccess?: () => void;
+  preset?: MealSuggestion | null;
 }) {
   const [saveState, saveAction] = useActionState(
     createNutritionEntryAction,
@@ -46,12 +49,18 @@ export function NutritionForm({
     estimateNutritionAction,
     {},
   );
-  const [showMacros, setShowMacros] = useState(false);
-  const [energy, setEnergy] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
-  const [fiber, setFiber] = useState("");
+  const [showMacros, setShowMacros] = useState(preset != null);
+  const [energy, setEnergy] = useState(
+    preset ? String(preset.energyKcal) : "",
+  );
+  const [protein, setProtein] = useState(
+    preset ? String(preset.proteinG) : "",
+  );
+  const [carbs, setCarbs] = useState(
+    preset ? String(preset.carbohydrateG) : "",
+  );
+  const [fat, setFat] = useState(preset ? String(preset.fatG) : "");
+  const [fiber, setFiber] = useState(preset ? String(preset.fiberG) : "");
   const [appliedRequestId, setAppliedRequestId] = useState<string | null>(null);
 
   if (
@@ -147,11 +156,16 @@ export function NutritionForm({
             maxLength={2000}
             rows={3}
             placeholder="Havregrynsgröt, banan och kaffe"
+            defaultValue={preset?.description ?? ""}
           />
         </Field>
         <Field>
           <FieldLabel htmlFor="mealType">Måltid</FieldLabel>
-          <NativeSelect id="mealType" name="mealType" defaultValue="breakfast">
+          <NativeSelect
+            id="mealType"
+            name="mealType"
+            defaultValue={preset?.mealType ?? "breakfast"}
+          >
             {Object.entries(MEAL_TYPE_LABEL).map(([value, label]) => (
               <NativeSelectOption key={value} value={value}>
                 {label}

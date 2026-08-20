@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import {
   Card,
   CardContent,
@@ -8,10 +6,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { BackendUnavailable } from "@/features/dashboard/backend-unavailable";
+import { WeekRecapHistory } from "@/features/dashboard/week-recap";
 import { mapActivityRow, mapHealthRow } from "@/features/dashboard/map-rows";
 import { MetricCard } from "@/features/dashboard/metric-card";
 import { RecommendationCard } from "@/features/recommendations/recommendation-card";
 import { mapRecommendationRow } from "@/features/recommendations/service";
+import { ensureWeekRecaps } from "@/features/week-recap/service";
 import { strengthFrequency } from "@/lib/analytics/strength";
 import { computeDashboard } from "@/lib/analytics/dashboard";
 import type { AnalyticsContext } from "@/lib/analytics/types";
@@ -28,7 +28,11 @@ export default async function WeeklyReportPage() {
 
   let data: WeeklyReportPayload | null = null;
   try {
-    data = await getWeeklyReportData(since, since.slice(0, 10), now.toISOString()) as unknown as WeeklyReportPayload;
+    data = (await getWeeklyReportData(
+      since,
+      since.slice(0, 10),
+      now.toISOString(),
+    )) as unknown as WeeklyReportPayload;
   } catch {
     data = null;
   }
@@ -36,10 +40,17 @@ export default async function WeeklyReportPage() {
   if (!data) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Veckorapport</h1>
+        <h1 className="page-title">Veckorapport</h1>
         <BackendUnavailable />
       </div>
     );
+  }
+
+  let recaps: Awaited<ReturnType<typeof ensureWeekRecaps>> = [];
+  try {
+    recaps = await ensureWeekRecaps(now);
+  } catch {
+    recaps = [];
   }
 
   const preferences = data.user_preferences[0];
@@ -79,15 +90,12 @@ export default async function WeeklyReportPage() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Veckorapport</h1>
-        <p className="text-muted-foreground">
-          Sammanfattning av senaste veckan och aktuell rekommendation.{" "}
-          <Link href="/overview" className="underline">
-            Till översikt
-          </Link>
-        </p>
-      </div>
+      <h1 className="page-title">Veckorapport</h1>
+
+      <section className="space-y-3">
+        <h2 className="panel-title">Veckosummeringar</h2>
+        <WeekRecapHistory recaps={recaps} />
+      </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard

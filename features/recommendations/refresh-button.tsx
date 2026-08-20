@@ -11,7 +11,7 @@ export function RefreshRecommendationButton() {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="sm"
       disabled={pending}
       onClick={() => {

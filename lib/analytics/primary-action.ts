@@ -16,7 +16,11 @@ export function primaryAction(input: {
   paceGap: MetricResult<number>;
   recommendation?: RecommendationDraft | null;
 }): PrimaryAction {
-  if (input.recommendation) {
+  if (
+    input.recommendation &&
+    input.recommendation.ruleId !== "data_completeness_import" &&
+    input.recommendation.actionKey !== "import_more_data"
+  ) {
     return primaryActionFromRecommendation(input.recommendation);
   }
   if (input.pendingImportId) {
@@ -32,14 +36,6 @@ export function primaryAction(input: {
       label: "Hämta in första passet",
       reason:
         "Inga löppass ännu. Exportera FIT från Garmin Connect och släpp filen — Formkurvan tar det härifrån.",
-    };
-  }
-  if ((input.completeness.value ?? 0) < 0.4) {
-    return {
-      href: "/import",
-      label: "Hämta ikapp klockan",
-      reason:
-        "Flera serier saknas. Sömn och HRV finns oftast i FIT-hälsoexport. Dubbletter hoppas över.",
     };
   }
   if ((input.paceGap.value ?? 0) > 15) {

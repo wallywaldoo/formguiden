@@ -8,12 +8,15 @@ import {
   toIso,
   toLocalDate,
 } from "@/lib/import/normalize";
+import { toLatitude, toLongitude } from "@/lib/garmin/geo";
 import type {
   ActivityType,
   CanonicalActivity,
+  CanonicalActivitySample,
   CanonicalBodyMeasurement,
   CanonicalDailyHealth,
   CanonicalLap,
+  CanonicalTrackpoint,
   ParseResult,
 } from "@/lib/import/types";
 
@@ -25,6 +28,10 @@ function asMessages(value: unknown): FitMessage[] {
 
 function num(message: FitMessage, key: string): number | null {
   return positiveNumber(message[key]);
+}
+
+function anyNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function dateIso(message: FitMessage, key: string): string | null {
@@ -79,6 +86,8 @@ function buildExternalId(
 function toActivity(
   session: FitMessage,
   laps: CanonicalLap[],
+  trackpoints: CanonicalTrackpoint[],
+  samples: CanonicalActivitySample[],
   fileId: FitMessage | undefined,
   bytes: Uint8Array,
 ): CanonicalActivity | null {
@@ -104,14 +113,44 @@ function toActivity(
     avgPaceSPerKm: derivedPace(distanceM, durationS),
     avgHeartRateBpm: num(session, "avgHeartRate"),
     maxHeartRateBpm: num(session, "maxHeartRate"),
-    avgCadence: num(session, "avgCadence"),
+    avgCadence: runningCadence(
+      mapSport(session.sport ?? session.subSport),
+      num(session, "avgCadence"),
+    ),
     caloriesKcal: num(session, "totalCalories"),
     trainingLoad:
       num(session, "trainingStressScore") ??
       num(session, "totalTrainingEffect"),
     notes: null,
     laps,
+    trackpoints,
+    samples,
+    providerPayload: {
+      avgSpeed: anyNumber(session.avgSpeed),
+      maxSpeed: anyNumber(session.maxSpeed),
+      avgPower: anyNumber(session.avgPower),
+      maxPower: anyNumber(session.maxPower),
+      normalizedPower: anyNumber(session.normalizedPower),
+      trainingEffect: anyNumber(session.totalTrainingEffect),
+      anaerobicTrainingEffect: anyNumber(session.totalAnaerobicTrainingEffect),
+      event: session.event,
+      eventType: session.eventType,
+      sport: session.sport,
+      subSport: session.subSport,
+    },
   };
+}
+
+function runningCadence(
+  activityType: ActivityType,
+  cadence: number | null,
+): number | null {
+  if (cadence == null) return null;
+  const isRun =
+    activityType === "run" ||
+    activityType === "trail_run" ||
+    activityType === "treadmill";
+  return isRun && cadence > 0 && cadence < 100 ? cadence * 2 : cadence;
 }
 
 function toLaps(messages: FitMessage[]): CanonicalLap[] {
@@ -130,6 +169,70 @@ function toLaps(messages: FitMessage[]): CanonicalLap[] {
       elevationGainM: num(lap, "totalAscent"),
     };
   });
+}
+
+function toTrackpoints(
+  messages: FitMessage[],
+  activityType: ActivityType,
+): { trackpoints: CanonicalTrackpoint[]; samples: CanonicalActivitySample[] } {
+  const trackpoints: CanonicalTrackpoint[] = [];
+  const samples: CanonicalActivitySample[] = [];
+  const firstRecordedAt = dateIso(messages[0] ?? {}, "timestamp");
+
+  for (const [index, record] of messages.entries()) {
+    const recordedAt = dateIso(record, "timestamp");
+    if (!recordedAt) continue;
+
+    const heartRateBpm = num(record, "heartRate");
+    const cadence = runningCadence(activityType, num(record, "cadence"));
+    const speedMps = anyNumber(record.enhancedSpeed) ?? anyNumber(record.speed);
+    const altitudeM =
+      anyNumber(record.enhancedAltitude) ?? anyNumber(record.altitude);
+    const distanceM = num(record, "distance");
+    const powerW = num(record, "power");
+    const temperatureC = anyNumber(record.temperature);
+    const elapsedS = firstRecordedAt
+      ? Math.max(
+          0,
+          Math.round(
+            (Date.parse(recordedAt) - Date.parse(firstRecordedAt)) / 1000,
+          ),
+        )
+      : null;
+
+    samples.push({
+      sampleIndex: index + 1,
+      recordedAt,
+      elapsedS,
+      distanceM,
+      heartRateBpm,
+      cadence,
+      speedMps,
+      altitudeM,
+      powerW,
+      temperatureC,
+    });
+
+    const latitude = toLatitude(anyNumber(record.positionLat));
+    const longitude = toLongitude(anyNumber(record.positionLong));
+    if (latitude == null || longitude == null) continue;
+
+    trackpoints.push({
+      pointIndex: trackpoints.length + 1,
+      recordedAt,
+      latitude,
+      longitude,
+      altitudeM,
+      distanceM,
+      heartRateBpm,
+      cadence,
+      speedMps,
+      powerW,
+      temperatureC,
+    });
+  }
+
+  return { trackpoints, samples };
 }
 
 export function parseFit(bytes: Uint8Array): ParseResult {
@@ -166,10 +269,22 @@ export function parseFit(bytes: Uint8Array): ParseResult {
   const fileId = asMessages(messages.fileIdMesgs)[0];
   const sessions = asMessages(messages.sessionMesgs);
   const laps = toLaps(asMessages(messages.lapMesgs));
+  const sportHint = mapSport(sessions[0]?.sport ?? sessions[0]?.subSport);
+  const { trackpoints, samples } = toTrackpoints(
+    asMessages(messages.recordMesgs),
+    sportHint,
+  );
   const activities: CanonicalActivity[] = [];
 
   for (const session of sessions) {
-    const activity = toActivity(session, laps, fileId, bytes);
+    const activity = toActivity(
+      session,
+      laps,
+      trackpoints,
+      samples,
+      fileId,
+      bytes,
+    );
     if (activity) {
       activities.push(activity);
     }
@@ -178,7 +293,14 @@ export function parseFit(bytes: Uint8Array): ParseResult {
   if (activities.length === 0) {
     const activityMesg = asMessages(messages.activityMesgs)[0];
     if (activityMesg) {
-      const fallback = toActivity(activityMesg, laps, fileId, bytes);
+      const fallback = toActivity(
+        activityMesg,
+        laps,
+        trackpoints,
+        samples,
+        fileId,
+        bytes,
+      );
       if (fallback) {
         activities.push(fallback);
       }

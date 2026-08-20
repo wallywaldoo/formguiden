@@ -144,7 +144,11 @@ export async function ensureFreshRecommendation(input: {
       LIMIT 1
     `;
     const latest = rows[0] as RecommendationRow | undefined;
-    if (latest) {
+    if (
+      latest &&
+      latest.rule_id !== "data_completeness_import" &&
+      latest.action_key !== "import_more_data"
+    ) {
       return mapStored(latest);
     }
   }

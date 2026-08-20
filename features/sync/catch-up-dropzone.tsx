@@ -88,7 +88,7 @@ export function CatchUpDropzone({
         }}
         className={cn(
           "flex flex-col items-center justify-center rounded-[1.75rem] border border-dashed px-6 text-center transition-colors",
-          variant === "full" ? "min-h-56 gap-3 py-12" : "min-h-28 gap-2 py-6",
+          variant === "full" ? "min-h-56 gap-3 py-12" : "min-h-20 gap-1.5 py-4",
           hover || busy
             ? "border-primary/50 bg-white/82"
             : "border-white/55 bg-white/52",
@@ -111,19 +111,22 @@ export function CatchUpDropzone({
         <p
           className={cn(
             "font-medium tracking-tight",
-            variant === "full" ? "text-xl" : "text-base",
+            variant === "full" ? "text-xl" : "text-[0.92rem]",
           )}
         >
-          {busy ? "Hämtar in…" : "Släpp passet här"}
+          {busy ? "Hämtar in…" : "Lägg till passfiler"}
         </p>
-        <p className="max-w-md text-sm text-muted-foreground">
-          FIT, TCX, GPX, CSV eller ZIP. Max 25 MiB per fil. Dubbletter hoppas
-          över, så du kan släppa samma vecka flera gånger.
-        </p>
+        {variant === "full" ? (
+          <p className="max-w-md text-sm text-muted-foreground">
+            FIT, TCX, GPX, CSV eller ZIP. Max 25 MiB per fil. Dubbletter hoppas
+            över, så du kan välja samma vecka flera gånger.
+          </p>
+        ) : null}
         <Button
           type="button"
           variant="outline"
           disabled={busy}
+          className="h-11 w-full max-w-xs shadow-none"
           onClick={() => inputRef.current?.click()}
         >
           {busy ? "Laddar upp…" : "Välj filer"}

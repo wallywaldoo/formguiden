@@ -15,6 +15,9 @@ import { DEFAULT_TIMEZONE } from "@/lib/constants";
 
 export function ProfileSettingsForm({
   displayName,
+  dateOfBirth,
+  sexAtBirth,
+  heightCm,
   timezone,
   distanceUnit,
   massUnit,
@@ -23,6 +26,9 @@ export function ProfileSettingsForm({
   timeZones,
 }: {
   displayName: string;
+  dateOfBirth: string;
+  sexAtBirth: string;
+  heightCm: string;
   timezone: string;
   distanceUnit: string;
   massUnit: string;
@@ -47,6 +53,37 @@ export function ProfileSettingsForm({
             name="displayName"
             defaultValue={displayName}
             maxLength={32}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="dateOfBirth">Födelsedatum</FieldLabel>
+          <Input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            defaultValue={dateOfBirth}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="sexAtBirth">Kön</FieldLabel>
+          <NativeSelect
+            id="sexAtBirth"
+            name="sexAtBirth"
+            defaultValue={sexAtBirth || "unspecified"}
+          >
+            <NativeSelectOption value="male">Man</NativeSelectOption>
+            <NativeSelectOption value="female">Kvinna</NativeSelectOption>
+            <NativeSelectOption value="unspecified">Vill inte ange</NativeSelectOption>
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="heightCm">Längd (cm)</FieldLabel>
+          <Input
+            id="heightCm"
+            name="heightCm"
+            inputMode="decimal"
+            defaultValue={heightCm}
+            placeholder="175"
           />
         </Field>
         <Field>

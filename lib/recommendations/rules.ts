@@ -283,43 +283,6 @@ export const RECOMMENDATION_RULES: Rule[] = [
     },
   },
   {
-    priority: 50,
-    evaluate(input) {
-      if (input.pendingImportId) {
-        return null;
-      }
-      const metrics = sharedMetrics(input);
-      const value = metrics.completeness.value;
-      if (value == null || value >= 0.4) {
-        return null;
-      }
-      if (runFamilyActivities(input.activities).length === 0) {
-        return null;
-      }
-      return {
-        ruleId: "data_completeness_import",
-        actionKey: "import_more_data",
-        actionSv: "Hämta in fler Garmin-filer",
-        href: "/import",
-        comparisonPeriodDays: 90,
-        completeness: value,
-        confidence: value < 0.25 ? "low" : "medium",
-        disclaimerKey: "training_general",
-        formulaKeys: ["data_completeness"],
-        priority: 50,
-        signals: [
-          {
-            signalKey: "data_completeness",
-            observedValue: value,
-            unit: "ratio",
-            comparator: "lt",
-            referenceValue: 0.4,
-          },
-        ],
-      };
-    },
-  },
-  {
     priority: 100,
     evaluate(input) {
       if (input.pendingImportId) {

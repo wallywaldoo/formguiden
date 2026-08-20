@@ -10,19 +10,28 @@ type Series = Array<{ date: string; distanceKm: number }>;
 export function DistanceRangeChart({
   series,
 }: {
-  series: { "7": Series; "28": Series; "90": Series };
+  series: { "7": Series; "28": Series; "90": Series; all: Series };
 }) {
-  const [range, setRange] = useState<"7" | "28" | "90">("28");
+  const [range, setRange] = useState<"7" | "28" | "90" | "all">("28");
 
   return (
     <Tabs
       value={range}
-      onValueChange={(value) => setRange(value as "7" | "28" | "90")}
+      onValueChange={(value) => setRange(value as "7" | "28" | "90" | "all")}
     >
-      <TabsList>
-        <TabsTrigger value="7">7 dagar</TabsTrigger>
-        <TabsTrigger value="28">28 dagar</TabsTrigger>
-        <TabsTrigger value="90">90 dagar</TabsTrigger>
+      <TabsList className="h-auto w-full max-w-full flex-wrap justify-start">
+        <TabsTrigger value="7" className="min-h-10">
+          7d
+        </TabsTrigger>
+        <TabsTrigger value="28" className="min-h-10">
+          28d
+        </TabsTrigger>
+        <TabsTrigger value="90" className="min-h-10">
+          90d
+        </TabsTrigger>
+        <TabsTrigger value="all" className="min-h-10">
+          Alla
+        </TabsTrigger>
       </TabsList>
       <TabsContent value={range} className="mt-4">
         <DistanceChart data={series[range]} />

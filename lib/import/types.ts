@@ -34,6 +34,9 @@ export type CanonicalActivity = {
   trainingLoad: number | null;
   notes: string | null;
   laps: CanonicalLap[];
+  trackpoints?: CanonicalTrackpoint[];
+  samples?: CanonicalActivitySample[];
+  providerPayload?: Record<string, unknown> | null;
 };
 
 export type CanonicalLap = {
@@ -45,6 +48,37 @@ export type CanonicalLap = {
   avgPaceSPerKm: number | null;
   avgHeartRateBpm: number | null;
   elevationGainM: number | null;
+  maxHeartRateBpm?: number | null;
+  avgCadence?: number | null;
+  elevationLossM?: number | null;
+  caloriesKcal?: number | null;
+};
+
+export type CanonicalTrackpoint = {
+  pointIndex: number;
+  recordedAt: string;
+  latitude: number;
+  longitude: number;
+  altitudeM: number | null;
+  distanceM: number | null;
+  heartRateBpm: number | null;
+  cadence: number | null;
+  speedMps: number | null;
+  powerW: number | null;
+  temperatureC: number | null;
+};
+
+export type CanonicalActivitySample = {
+  sampleIndex: number;
+  recordedAt: string;
+  elapsedS: number | null;
+  distanceM: number | null;
+  heartRateBpm: number | null;
+  cadence: number | null;
+  speedMps: number | null;
+  altitudeM: number | null;
+  powerW: number | null;
+  temperatureC: number | null;
 };
 
 export type CanonicalDailyHealth = {

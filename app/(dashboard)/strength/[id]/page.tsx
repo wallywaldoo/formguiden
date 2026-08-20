@@ -52,7 +52,7 @@ export default async function StrengthSessionPage({
   if (!data) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Styrkepass</h1>
+        <h1 className="page-title">Styrkepass</h1>
         <BackendUnavailable />
       </div>
     );
@@ -71,7 +71,7 @@ export default async function StrengthSessionPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Styrkepass</h1>
+          <h1 className="page-title">Styrkepass</h1>
           <p className="text-muted-foreground">
             {new Date(session.started_at).toLocaleString("sv-SE")}
           </p>

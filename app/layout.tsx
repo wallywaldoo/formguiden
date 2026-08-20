@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 
@@ -8,12 +8,23 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Formkurvan",
-  description: "Kör. Dela. Formkurvan tar hand om resten.",
+  description: "Privat träningsöversikt.",
   appleWebApp: {
     capable: true,
     title: "Formkurvan",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#eef4fa",
 };
 
 export default function RootLayout({
@@ -25,9 +36,9 @@ export default function RootLayout({
     <html
       lang="sv"
       suppressHydrationWarning
-      className="h-full antialiased"
+      className="min-h-dvh antialiased"
     >
-      <body className="min-h-full bg-background text-foreground">
+      <body className="min-h-dvh bg-background text-foreground">
         {/* THESIS: Formkurvan should feel like a focused recovery-and-training cockpit, not a generic dashboard grid.
             OWN-WORLD: Frosted mineral glass, cool daylight gradients, luminous blue accents, rounded plates, and soft depth that stays crisp under dense data.
             STORY: The athlete lands on one calm overview, understands current status within seconds, then moves directly into coach, logging, or catch-up work.

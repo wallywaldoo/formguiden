@@ -145,6 +145,26 @@ describe("recommendation rules", () => {
     expect(result?.ruleId).toBe("pace_gap_review");
   });
 
+  it("does not nag for more Garmin files when data is incomplete", () => {
+    const result = evaluateRecommendation({
+      activities: [
+        run({
+          id: "only-run",
+          startedAt: "2026-04-14T06:00:00.000Z",
+          distanceM: 20_000,
+        }),
+      ],
+      health: [],
+      body: [],
+      strengthSessions: [],
+      context,
+      weeklyStrengthTarget: null,
+      pendingImportId: null,
+    });
+    expect(result?.ruleId).not.toBe("data_completeness_import");
+    expect(result?.actionSv).not.toBe("Hämta in fler Garmin-filer");
+  });
+
   it("returns null while an import preview is pending", () => {
     const result = evaluateRecommendation({
       activities: [run({ id: "1", startedAt: "2026-04-14T06:00:00.000Z" })],

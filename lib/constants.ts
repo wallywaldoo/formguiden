@@ -37,6 +37,7 @@ export const USER_EXPORTS_BUCKET = "user-exports";
  */
 export const GARMINDB_QUARANTINE_BUCKET = "garmindb-quarantine";
 
+export const DEFAULT_HYDRATION_TARGET_ML = 2_500;
 export const ACCOUNT_DELETION_GRACE_DAYS = 7;
 export const RECOMMENDATION_VALID_HOURS = 24;
 export const EXPORT_MAX_GARMIN_BYTES = 20 * 1024 * 1024;

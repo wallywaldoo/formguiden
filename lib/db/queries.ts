@@ -57,13 +57,18 @@ export async function getActiveGoal() {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export async function getDashboardData(since: string, sinceDate: string) {
-  const [preferences, goals, activities, health, body, imports] =
+  const [preferences, goals, profile, activities, health, body, imports] =
     await Promise.all([
       getUserPreferences(),
       getActiveGoal(),
       sql`
+        SELECT date_of_birth, sex_at_birth, height_cm
+        FROM profiles
+        LIMIT 1
+      `,
+      sql`
         SELECT id, activity_type, started_at, duration_s,
-               distance_m, avg_pace_s_per_km, avg_heart_rate_bpm
+               distance_m, avg_pace_s_per_km, avg_heart_rate_bpm, calories_kcal
         FROM activities
         WHERE started_at >= ${since}
         ORDER BY started_at DESC
@@ -95,6 +100,11 @@ export async function getDashboardData(since: string, sinceDate: string) {
   return {
     user_preferences: preferences,
     goals,
+    profile: (profile[0] ?? null) as {
+      date_of_birth: string | null;
+      sex_at_birth: string | null;
+      height_cm: unknown;
+    } | null,
     activities: activities as unknown as Array<{
       id: string;
       activity_type: string;
@@ -103,6 +113,7 @@ export async function getDashboardData(since: string, sinceDate: string) {
       distance_m: unknown;
       avg_pace_s_per_km: unknown;
       avg_heart_rate_bpm: unknown;
+      calories_kcal: unknown;
     }>,
     daily_health_metrics: health as unknown as Array<{
       local_date: string;
@@ -131,6 +142,56 @@ export async function getDashboardData(since: string, sinceDate: string) {
   };
 }
 
+export async function listRunDistanceHistory() {
+  const rows = await sql`
+    SELECT id, activity_type, started_at, duration_s,
+           distance_m, avg_pace_s_per_km, avg_heart_rate_bpm
+    FROM activities
+    WHERE activity_type IN ('run', 'trail_run', 'treadmill')
+      AND distance_m IS NOT NULL
+    ORDER BY started_at ASC
+    LIMIT 20000
+  `;
+  return rows as unknown as Array<{
+    id: string;
+    activity_type: string;
+    started_at: string;
+    duration_s: number | null;
+    distance_m: unknown;
+    avg_pace_s_per_km: unknown;
+    avg_heart_rate_bpm: unknown;
+  }>;
+}
+
+export async function listRecentFuel(since: string) {
+  const [nutrition, hydration] = await Promise.all([
+    sql`
+      SELECT eaten_at, energy_kcal
+      FROM nutrition_entries
+      WHERE eaten_at >= ${since}
+      ORDER BY eaten_at DESC
+      LIMIT 800
+    `,
+    sql`
+      SELECT consumed_at, volume_ml
+      FROM hydration_entries
+      WHERE consumed_at >= ${since}
+      ORDER BY consumed_at DESC
+      LIMIT 800
+    `,
+  ]);
+  return {
+    nutrition: nutrition as unknown as Array<{
+      eaten_at: string;
+      energy_kcal: unknown;
+    }>,
+    hydration: hydration as unknown as Array<{
+      consumed_at: string;
+      volume_ml: unknown;
+    }>,
+  };
+}
+
 export async function getGarminIntegrationStatus() {
   const rows = await sql`
     SELECT provider, status, connected_at, metadata
@@ -139,29 +200,28 @@ export async function getGarminIntegrationStatus() {
     LIMIT 1
   `;
 
-  return (rows[0] ?? null) as
-    | {
-        provider: string;
-        status: string;
-        connected_at: string | null;
-        metadata: Record<string, unknown> | null;
-      }
-    | null;
+  return (rows[0] ?? null) as {
+    provider: string;
+    status: string;
+    connected_at: string | null;
+    metadata: Record<string, unknown> | null;
+  } | null;
 }
 
 // ─── Activities ───────────────────────────────────────────────────────────────
 
-export async function listActivities(since: string) {
+export async function listRunActivities(limit = 4000) {
   const [preferences, goals, activities] = await Promise.all([
     getUserPreferences(),
     getActiveGoal(),
     sql`
       SELECT id, activity_type, started_at, duration_s, distance_m,
-             avg_pace_s_per_km, avg_heart_rate_bpm, elevation_gain_m, calories_kcal
+             avg_pace_s_per_km, avg_heart_rate_bpm, elevation_gain_m, calories_kcal,
+             notes, detail_hydrated_at
       FROM activities
-      WHERE started_at >= ${since}
+      WHERE activity_type IN ('run', 'trail_run', 'treadmill')
       ORDER BY started_at DESC
-      LIMIT 500
+      LIMIT ${limit}
     `,
   ]);
   return {
@@ -177,30 +237,82 @@ export async function listActivities(since: string) {
       avg_heart_rate_bpm: unknown;
       elevation_gain_m: unknown;
       calories_kcal: unknown;
+      notes: string | null;
+      detail_hydrated_at: string | Date | null;
+    }>,
+  };
+}
+
+export async function listActivities(since: string, limit = 2000) {
+  const [preferences, goals, activities] = await Promise.all([
+    getUserPreferences(),
+    getActiveGoal(),
+    sql`
+      SELECT id, activity_type, started_at, duration_s, distance_m,
+             avg_pace_s_per_km, avg_heart_rate_bpm, elevation_gain_m, calories_kcal,
+             notes, detail_hydrated_at
+      FROM activities
+      WHERE started_at >= ${since}
+      ORDER BY started_at DESC
+      LIMIT ${limit}
+    `,
+  ]);
+  return {
+    user_preferences: preferences,
+    goals,
+    activities: activities as unknown as Array<{
+      id: string;
+      activity_type: string;
+      started_at: string;
+      duration_s: number | null;
+      distance_m: unknown;
+      avg_pace_s_per_km: unknown;
+      avg_heart_rate_bpm: unknown;
+      elevation_gain_m: unknown;
+      calories_kcal: unknown;
+      notes: string | null;
+      detail_hydrated_at: string | Date | null;
     }>,
   };
 }
 
 export async function getActivity(id: string) {
-  const [preferences, activityRows, laps] = await Promise.all([
-    getUserPreferences(),
-    sql`
+  const [preferences, activityRows, laps, trackpoints, samples] =
+    await Promise.all([
+      getUserPreferences(),
+      sql`
       SELECT id, activity_type, started_at, ended_at, duration_s, duration_kind,
              distance_m, elevation_gain_m, elevation_loss_m, avg_pace_s_per_km,
              avg_heart_rate_bpm, max_heart_rate_bpm, avg_cadence, calories_kcal,
-             training_load, perceived_effort, notes, source
+             training_load, perceived_effort, notes, source, provider_payload,
+             external_id, detail_hydrated_at
       FROM activities
       WHERE id = ${id}
       LIMIT 1
     `,
-    sql`
+      sql`
       SELECT id, lap_index, kind, started_at, duration_s, distance_m,
-             avg_pace_s_per_km, avg_heart_rate_bpm, elevation_gain_m
+             avg_pace_s_per_km, avg_heart_rate_bpm, elevation_gain_m,
+             max_heart_rate_bpm, avg_cadence, elevation_loss_m, calories_kcal
       FROM activity_laps
       WHERE activity_id = ${id}
-      ORDER BY lap_index ASC
+      ORDER BY kind DESC, lap_index ASC
     `,
-  ]);
+      sql`
+      SELECT point_index, recorded_at, latitude, longitude, altitude_m, distance_m,
+             heart_rate_bpm, cadence, speed_mps, power_w, temperature_c
+      FROM activity_trackpoints
+      WHERE activity_id = ${id}
+      ORDER BY point_index ASC
+    `,
+      sql`
+      SELECT sample_index, recorded_at, elapsed_s, distance_m, heart_rate_bpm,
+             cadence, speed_mps, altitude_m, power_w, temperature_c
+      FROM activity_samples
+      WHERE activity_id = ${id}
+      ORDER BY sample_index ASC
+    `,
+    ]);
   return {
     user_preferences: preferences,
     activities_by_pk: (activityRows[0] ?? null) as unknown as {
@@ -222,6 +334,9 @@ export async function getActivity(id: string) {
       perceived_effort: unknown;
       notes: string | null;
       source: string;
+      provider_payload: Record<string, unknown> | null;
+      external_id: string | null;
+      detail_hydrated_at: string | null;
     } | null,
     activity_laps: laps as unknown as Array<{
       id: string;
@@ -233,6 +348,35 @@ export async function getActivity(id: string) {
       avg_pace_s_per_km: unknown;
       avg_heart_rate_bpm: unknown;
       elevation_gain_m: unknown;
+      max_heart_rate_bpm: unknown;
+      avg_cadence: unknown;
+      elevation_loss_m: unknown;
+      calories_kcal: unknown;
+    }>,
+    activity_trackpoints: trackpoints as unknown as Array<{
+      point_index: number;
+      recorded_at: string;
+      latitude: number;
+      longitude: number;
+      altitude_m: unknown;
+      distance_m: unknown;
+      heart_rate_bpm: unknown;
+      cadence: unknown;
+      speed_mps: unknown;
+      power_w: unknown;
+      temperature_c: unknown;
+    }>,
+    activity_samples: samples as unknown as Array<{
+      sample_index: number;
+      recorded_at: string;
+      elapsed_s: number | null;
+      distance_m: unknown;
+      heart_rate_bpm: unknown;
+      cadence: unknown;
+      speed_mps: unknown;
+      altitude_m: unknown;
+      power_w: unknown;
+      temperature_c: unknown;
     }>,
   };
 }
@@ -243,7 +387,7 @@ export async function listRecovery(sinceDate: string) {
   const [preferences, health] = await Promise.all([
     getUserPreferences(),
     sql`
-      SELECT id, local_date, sleep_duration_s, sleep_start_at, sleep_end_at,
+      SELECT id, local_date::text AS local_date, sleep_duration_s, sleep_start_at, sleep_end_at,
              sleep_light_s, sleep_deep_s, sleep_rem_s, sleep_awake_s,
              hrv_rmssd_ms, resting_heart_rate_bpm, stress_avg,
              body_battery_high, body_battery_low, steps, respiration_avg_brpm
@@ -279,9 +423,14 @@ export async function listRecovery(sinceDate: string) {
 // ─── Body ─────────────────────────────────────────────────────────────────────
 
 export async function listBodyMeasurements(since: string) {
-  const [preferences, goals, measurements] = await Promise.all([
+  const [preferences, goals, profile, measurements] = await Promise.all([
     getUserPreferences(),
     getActiveGoal(),
+    sql`
+      SELECT height_cm
+      FROM profiles
+      LIMIT 1
+    `,
     sql`
       SELECT id, measured_at, mass_kg, body_fat_pct, source
       FROM body_measurements
@@ -293,6 +442,7 @@ export async function listBodyMeasurements(since: string) {
   return {
     user_preferences: preferences,
     goals,
+    profile: (profile[0] ?? null) as { height_cm: unknown } | null,
     body_measurements: measurements as unknown as Array<{
       id: string;
       measured_at: string;
@@ -306,7 +456,7 @@ export async function listBodyMeasurements(since: string) {
 // ─── Strength ─────────────────────────────────────────────────────────────────
 
 export async function listStrengthSessions(since: string) {
-  const [preferences, goals, sessions] = await Promise.all([
+  const [preferences, goals, sessions, sets] = await Promise.all([
     getUserPreferences(),
     getActiveGoal(),
     sql`
@@ -315,6 +465,15 @@ export async function listStrengthSessions(since: string) {
       WHERE started_at >= ${since}
       ORDER BY started_at DESC
       LIMIT 100
+    `,
+    sql`
+      SELECT s.id, s.session_id, s.exercise_name, s.repetitions, s.mass_kg,
+             ss.started_at
+      FROM strength_sets s
+      INNER JOIN strength_sessions ss ON ss.id = s.session_id
+      WHERE ss.started_at >= ${since}
+      ORDER BY ss.started_at DESC, s.set_index ASC
+      LIMIT 2000
     `,
   ]);
   return {
@@ -327,6 +486,14 @@ export async function listStrengthSessions(since: string) {
       perceived_effort: unknown;
       notes: string | null;
       source: string;
+    }>,
+    strength_sets: sets as unknown as Array<{
+      id: string;
+      session_id: string;
+      exercise_name: string;
+      repetitions: number | null;
+      mass_kg: unknown;
+      started_at: string;
     }>,
   };
 }
@@ -372,7 +539,7 @@ export async function getStrengthSession(id: string) {
 // ─── Nutrition ────────────────────────────────────────────────────────────────
 
 export async function listNutrition(since: string) {
-  const [preferences, nutrition, hydration] = await Promise.all([
+  const [preferences, nutrition, hydration, profile, body] = await Promise.all([
     getUserPreferences(),
     sql`
       SELECT id, eaten_at, meal_type, description, energy_kcal,
@@ -389,9 +556,26 @@ export async function listNutrition(since: string) {
       ORDER BY consumed_at DESC
       LIMIT 200
     `,
+    sql`
+      SELECT date_of_birth, sex_at_birth, height_cm
+      FROM profiles
+      LIMIT 1
+    `,
+    sql`
+      SELECT mass_kg
+      FROM body_measurements
+      ORDER BY measured_at DESC
+      LIMIT 1
+    `,
   ]);
   return {
     user_preferences: preferences,
+    profile: (profile[0] ?? null) as {
+      date_of_birth: string | null;
+      sex_at_birth: string | null;
+      height_cm: unknown;
+    } | null,
+    latest_mass_kg: (body[0]?.mass_kg ?? null) as unknown,
     nutrition_entries: nutrition as unknown as Array<{
       id: string;
       eaten_at: string;
@@ -419,10 +603,11 @@ export async function listNutrition(since: string) {
 // ─── Goals page ───────────────────────────────────────────────────────────────
 
 export async function getGoalsPageData(since: string) {
-  const [preferences, goals, activities] = await Promise.all([
-    getUserPreferences(),
-    getActiveGoal(),
-    sql`
+  const [preferences, goals, activities, measurements, strength] =
+    await Promise.all([
+      getUserPreferences(),
+      getActiveGoal(),
+      sql`
       SELECT id, activity_type, started_at, duration_s,
              distance_m, avg_pace_s_per_km, avg_heart_rate_bpm
       FROM activities
@@ -430,7 +615,20 @@ export async function getGoalsPageData(since: string) {
       ORDER BY started_at DESC
       LIMIT 500
     `,
-  ]);
+      sql`
+      SELECT mass_kg
+      FROM body_measurements
+      ORDER BY measured_at DESC
+      LIMIT 1
+    `,
+      sql`
+      SELECT started_at
+      FROM strength_sessions
+      WHERE started_at >= ${since}
+      ORDER BY started_at DESC
+      LIMIT 80
+    `,
+    ]);
   return {
     user_preferences: preferences,
     goals,
@@ -443,6 +641,9 @@ export async function getGoalsPageData(since: string) {
       avg_pace_s_per_km: unknown;
       avg_heart_rate_bpm: unknown;
     }>,
+    latest_mass_kg: (measurements[0] as { mass_kg?: unknown } | undefined)
+      ?.mass_kg ?? null,
+    strength_sessions: strength as unknown as Array<{ started_at: string }>,
   };
 }
 
@@ -523,7 +724,9 @@ export async function getWeeklyReportData(
       hrv_rmssd_ms: unknown;
       resting_heart_rate_bpm: unknown;
     }>,
-    strength_sessions: strengthSessions as unknown as Array<{ started_at: string }>,
+    strength_sessions: strengthSessions as unknown as Array<{
+      started_at: string;
+    }>,
     recommendations: recs as unknown as Array<{
       id: string;
       generated_at: string;
@@ -543,6 +746,161 @@ export async function getWeeklyReportData(
         reference_value: unknown;
       }>;
     }>,
+  };
+}
+
+export async function listWeekRecaps(limit = 12) {
+  const rows = await sql`
+    SELECT week_start::text AS week_start, week_end::text AS week_end,
+           score, medal, headline, summary, dimensions
+    FROM week_recaps
+    ORDER BY week_start DESC
+    LIMIT ${limit}
+  `;
+  return rows as unknown as Array<{
+    week_start: string;
+    week_end: string;
+    score: number;
+    medal: string;
+    headline: string;
+    summary: string;
+    dimensions: unknown;
+  }>;
+}
+
+export async function insertWeekRecapIfMissing(recap: {
+  weekStart: string;
+  weekEnd: string;
+  score: number;
+  medal: string;
+  headline: string;
+  summary: string;
+  dimensions: unknown;
+}) {
+  await sql`
+    INSERT INTO week_recaps
+      (week_start, week_end, score, medal, headline, summary, dimensions, generated_at)
+    VALUES (
+      ${recap.weekStart},
+      ${recap.weekEnd},
+      ${recap.score},
+      ${recap.medal},
+      ${recap.headline},
+      ${recap.summary},
+      ${sql.json(recap.dimensions as never)},
+      now()
+    )
+    ON CONFLICT (week_start) DO NOTHING
+  `;
+}
+
+export async function upsertWeekRecap(recap: {
+  weekStart: string;
+  weekEnd: string;
+  score: number;
+  medal: string;
+  headline: string;
+  summary: string;
+  dimensions: unknown;
+}) {
+  await sql`
+    INSERT INTO week_recaps
+      (week_start, week_end, score, medal, headline, summary, dimensions, generated_at)
+    VALUES (
+      ${recap.weekStart},
+      ${recap.weekEnd},
+      ${recap.score},
+      ${recap.medal},
+      ${recap.headline},
+      ${recap.summary},
+      ${sql.json(recap.dimensions as never)},
+      now()
+    )
+    ON CONFLICT (week_start)
+    DO UPDATE SET
+      week_end = EXCLUDED.week_end,
+      score = EXCLUDED.score,
+      medal = EXCLUDED.medal,
+      headline = EXCLUDED.headline,
+      summary = EXCLUDED.summary,
+      dimensions = EXCLUDED.dimensions,
+      generated_at = now(),
+      updated_at = now()
+  `;
+}
+
+export async function listWeekPlansByStarts(weekStarts: string[]) {
+  if (weekStarts.length === 0) return [];
+  const rows = await sql`
+    SELECT local_date::text AS local_date, payload
+    FROM training_plans
+    WHERE plan_type = 'week'
+      AND local_date IN ${sql(weekStarts)}
+  `;
+  return rows as unknown as Array<{
+    local_date: string;
+    payload: unknown;
+  }>;
+}
+
+export async function listRecapSourceData(since: string, sinceDate: string) {
+  const [preferences, goals, profile, body, activities, health, fuel] =
+    await Promise.all([
+      sql`SELECT timezone FROM user_preferences LIMIT 1`,
+      sql`SELECT weekly_run_distance_m FROM goals WHERE status = 'active' LIMIT 1`,
+      sql`SELECT date_of_birth, sex_at_birth, height_cm FROM profiles LIMIT 1`,
+      sql`
+        SELECT mass_kg
+        FROM body_measurements
+        ORDER BY measured_at DESC
+        LIMIT 1
+      `,
+      sql`
+        SELECT activity_type, started_at, distance_m, calories_kcal
+        FROM activities
+        WHERE started_at >= ${since}
+        ORDER BY started_at DESC
+        LIMIT 500
+      `,
+      sql`
+        SELECT local_date, sleep_duration_s, sleep_start_at, hrv_rmssd_ms,
+               resting_heart_rate_bpm, steps, stress_avg,
+               body_battery_high, body_battery_low
+        FROM daily_health_metrics
+        WHERE local_date >= ${sinceDate}
+        ORDER BY local_date DESC
+        LIMIT 120
+      `,
+      listRecentFuel(since),
+    ]);
+
+  return {
+    timezone: (preferences[0]?.timezone as string | undefined) ?? null,
+    weeklyRunDistanceM: goals[0]?.weekly_run_distance_m ?? null,
+    profile: (profile[0] ?? null) as {
+      date_of_birth: string | null;
+      sex_at_birth: string | null;
+      height_cm: unknown;
+    } | null,
+    massKg: body[0]?.mass_kg ?? null,
+    activities: activities as unknown as Array<{
+      activity_type: string;
+      started_at: string;
+      distance_m: unknown;
+      calories_kcal: unknown;
+    }>,
+    health: health as unknown as Array<{
+      local_date: string;
+      sleep_duration_s: number | null;
+      sleep_start_at: string | null;
+      hrv_rmssd_ms: unknown;
+      resting_heart_rate_bpm: unknown;
+      steps: number | null;
+      stress_avg: unknown;
+      body_battery_high: unknown;
+      body_battery_low: unknown;
+    }>,
+    fuel,
   };
 }
 
@@ -629,7 +987,9 @@ export async function getImportDetail(id: string) {
       avg_pace_s_per_km: unknown;
       avg_heart_rate_bpm: number | null;
     }>,
-    daily_health_metric_previews: healthPreviews as unknown as Array<{ id: string }>,
+    daily_health_metric_previews: healthPreviews as unknown as Array<{
+      id: string;
+    }>,
     body_measurement_previews: bodyPreviews as unknown as Array<{ id: string }>,
   };
 }
@@ -674,7 +1034,8 @@ export async function getImportLanding(id: string) {
 export async function getProfileSettings() {
   const [profiles, preferences, goals] = await Promise.all([
     sql`
-      SELECT user_id, display_name, onboarding_completed_at, created_at, updated_at
+      SELECT id, display_name, date_of_birth, sex_at_birth, height_cm,
+             onboarding_completed_at, created_at, updated_at
       FROM profiles LIMIT 1
     `,
     sql`
@@ -686,8 +1047,11 @@ export async function getProfileSettings() {
   ]);
   return {
     profiles: profiles as unknown as Array<{
-      user_id: string;
+      id: string;
       display_name: string | null;
+      date_of_birth: string | null;
+      sex_at_birth: string | null;
+      height_cm: unknown;
       onboarding_completed_at: string | null;
       created_at: string;
       updated_at: string;

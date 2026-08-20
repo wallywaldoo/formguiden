@@ -20,21 +20,15 @@ export function CatchUpHero({
     : null;
 
   return (
-    <section className="glass-panel ambient-divider overflow-hidden rounded-[2rem] border border-white/50">
-      <div className="grid gap-8 p-5 md:grid-cols-[1.15fr_0.85fr] md:p-8">
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-muted-foreground">
-            Efter passet
-          </p>
-          <h2 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
+    <section className="glass-panel ambient-divider rounded-[1.4rem] border border-white/50">
+      <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center md:p-5">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-[1.05rem] font-semibold">
             {status.headline}
           </h2>
-          <p className="max-w-lg leading-7 text-muted-foreground text-pretty">
-            {status.body}
-          </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[0.88rem] text-muted-foreground">
             {lastLabel
-              ? `Senaste passet ${ago ?? lastLabel} · ${lastLabel}`
+              ? `Senaste pass ${ago ?? lastLabel}`
               : "Inget pass inne ännu."}
           </p>
         </div>

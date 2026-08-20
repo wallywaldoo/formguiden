@@ -6,9 +6,9 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_12px_24px_rgba(86,111,179,0.18)] [a]:hover:bg-primary/90",
+          "rounded-full bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_12px_24px_rgba(86,111,179,0.18)] [a]:hover:bg-primary/90",
         outline:
-          "border-white/55 bg-white/58 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] hover:bg-white/76 hover:text-foreground aria-expanded:bg-white/76 aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "rounded-full border-primary/10 bg-primary/4 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] hover:border-primary/14 hover:bg-primary/8 hover:text-foreground aria-expanded:border-primary/14 aria-expanded:bg-primary/8 aria-expanded:text-foreground dark:border-primary/16 dark:bg-primary/10 dark:text-primary-foreground dark:hover:bg-primary/14",
         secondary:
           "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] hover:bg-secondary/88 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:

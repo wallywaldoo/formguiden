@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -22,13 +23,21 @@ import { deleteWeightEntryAction } from "@/features/body/actions";
 import { WeightForm } from "@/features/body/weight-form";
 import { DeleteLogButton } from "@/features/logging/delete-log-button";
 import { BODY_SOURCE_LABEL } from "@/features/logging/labels";
-import { bodyWeightTrend, latestMass, massSeries } from "@/lib/analytics/body";
+import {
+  bodyFatSeries,
+  bodyMassIndex,
+  bodyWeightTrend,
+  latestMass,
+  massGoalProgress,
+  massSeries,
+} from "@/lib/analytics/body";
 import { toDatetimeLocal } from "@/lib/analytics/dates";
 import type { AnalyticsContext } from "@/lib/analytics/types";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import { listBodyMeasurements } from "@/lib/db/queries";
 import { toFiniteNumber } from "@/lib/numbers";
 import { formatMassKg } from "@/lib/units/format";
+import { cn } from "@/lib/utils";
 
 export default async function BodyPage() {
   const now = new Date();
@@ -44,7 +53,7 @@ export default async function BodyPage() {
   if (!data) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Kropp</h1>
+        <h1 className="page-title">Kropp</h1>
         <BackendUnavailable />
       </div>
     );
@@ -68,23 +77,41 @@ export default async function BodyPage() {
     date: point.date,
     massKg: point.massKg,
   }));
+  const fatSeries = bodyFatSeries(points, context, 90).map((point) => ({
+    date: point.date,
+    bodyFatPct: point.bodyFatPct,
+  }));
+  const heightCm = toFiniteNumber(data.profile?.height_cm);
+  const bmi = bodyMassIndex(latest, heightCm);
+  const startKg = series[0]?.massKg ?? latest;
+  const goalPct =
+    latest != null && target != null && startKg != null
+      ? massGoalProgress(latest, target, startKg)
+      : null;
+
+  const measurements = data.body_measurements;
+  const rows = measurements.map((row, index) => {
+    const mass = toFiniteNumber(row.mass_kg);
+    const fat = toFiniteNumber(row.body_fat_pct);
+    const older = measurements[index + 1];
+    const olderMass = older ? toFiniteNumber(older.mass_kg) : null;
+    const olderFat = older ? toFiniteNumber(older.body_fat_pct) : null;
+    return {
+      ...row,
+      mass,
+      fat,
+      massTrend: trendArrow(mass, olderMass),
+      fatTrend: trendArrow(fat, olderFat),
+    };
+  });
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Kropp</h1>
-        <p className="text-muted-foreground">
-          Vikt från Garmin-filer och manuell loggning. Saknade fält lämnas
-          tomma.
-        </p>
-      </div>
+      <h1 className="page-title">Kropp</h1>
 
       <Card>
         <CardHeader>
           <CardTitle>Logga vikt</CardTitle>
-          <CardDescription>
-            Manuell mätning lagras som source=manual.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <WeightForm
@@ -95,7 +122,7 @@ export default async function BodyPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={cn("grid gap-4", bmi ? "md:grid-cols-4" : "md:grid-cols-3")}>
         <MetricCard
           title="Senaste vikt"
           value={latest != null ? formatMassKg(latest, massUnit) : "—"}
@@ -123,7 +150,42 @@ export default async function BodyPage() {
               : "—"
           }
         />
+        {bmi ? (
+          <MetricCard
+            title="BMI"
+            value={bmi.value.toFixed(1)}
+            caption={bmi.category}
+          />
+        ) : null}
       </div>
+
+      {latest != null && target != null && goalPct != null ? (
+        <div className="surface-tile space-y-3 px-5 py-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[0.78rem] font-medium text-muted-foreground">
+                Viktmål
+              </p>
+              <p className="text-[1.05rem] font-semibold tabular-nums">
+                {Math.round(goalPct)} % klart
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {formatMassKg(latest, massUnit)} → {formatMassKg(target, massUnit)}
+            </p>
+          </div>
+          <Progress
+            value={goalPct}
+            className="h-3 rounded-full border border-white/45 bg-white/45"
+            indicatorClassName="rounded-full bg-primary"
+          />
+          {startKg != null && startKg !== latest ? (
+            <p className="text-xs text-muted-foreground">
+              Start {formatMassKg(startKg, massUnit)}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -144,53 +206,85 @@ export default async function BodyPage() {
         </CardContent>
       </Card>
 
-      {data.body_measurements.length > 0 ? (
+      {fatSeries.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Kroppsfett</CardTitle>
+            <CardDescription>Body fat % över tid.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LineMetricChart
+              data={fatSeries}
+              dataKey="bodyFatPct"
+              label="%"
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {rows.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>Mätningar</CardTitle>
+            <CardDescription>
+              Pil visar förändring mot föregående mätning.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tid</TableHead>
-                  <TableHead>Vikt</TableHead>
-                  <TableHead>Fett %</TableHead>
-                  <TableHead>Källa</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.body_measurements.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      {new Date(row.measured_at).toLocaleString("sv-SE")}
-                    </TableCell>
-                    <TableCell>
-                      {toFiniteNumber(row.mass_kg) != null
-                        ? formatMassKg(toFiniteNumber(row.mass_kg)!, massUnit)
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {toFiniteNumber(row.body_fat_pct) != null
-                        ? `${toFiniteNumber(row.body_fat_pct)!.toFixed(1)} %`
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {BODY_SOURCE_LABEL[row.source] ?? row.source}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DeleteLogButton
-                        action={deleteWeightEntryAction}
-                        id={row.id}
-                        label="Ta bort mätning?"
-                        description="Viktmätningen raderas."
-                      />
-                    </TableCell>
+            <div className="overflow-hidden rounded-2xl border border-white/45 bg-white/35">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/40 hover:bg-transparent">
+                    <TableHead>Tid</TableHead>
+                    <TableHead>Vikt</TableHead>
+                    <TableHead>Fett %</TableHead>
+                    <TableHead>Källa</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className="border-white/35 hover:bg-white/40"
+                    >
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {new Date(row.measured_at).toLocaleString("sv-SE")}
+                      </TableCell>
+                      <TableCell>
+                        <TrendValue
+                          label={
+                            row.mass != null
+                              ? formatMassKg(row.mass, massUnit)
+                              : "—"
+                          }
+                          trend={row.massTrend}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <TrendValue
+                          label={
+                            row.fat != null ? `${row.fat.toFixed(1)} %` : "—"
+                          }
+                          trend={row.fatTrend}
+                        />
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {BODY_SOURCE_LABEL[row.source] ?? row.source}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DeleteLogButton
+                          action={deleteWeightEntryAction}
+                          id={row.id}
+                          label="Ta bort mätning?"
+                          description="Viktmätningen raderas."
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -198,9 +292,53 @@ export default async function BodyPage() {
   );
 }
 
+function trendArrow(
+  current: number | null,
+  previous: number | null,
+): "up" | "down" | "same" | null {
+  if (current == null || previous == null) {
+    return null;
+  }
+  const delta = current - previous;
+  if (Math.abs(delta) < 0.05) {
+    return "same";
+  }
+  return delta > 0 ? "up" : "down";
+}
+
+function TrendValue({
+  label,
+  trend,
+}: {
+  label: string;
+  trend: "up" | "down" | "same" | null;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 tabular-nums">
+      <span>{label}</span>
+      {trend === "up" ? (
+        <span className="text-xs font-medium text-amber-600" aria-label="Ökat">
+          ▲
+        </span>
+      ) : null}
+      {trend === "down" ? (
+        <span className="text-xs font-medium text-emerald-600" aria-label="Minskat">
+          ▼
+        </span>
+      ) : null}
+      {trend === "same" ? (
+        <span className="text-xs text-muted-foreground" aria-label="Oförändrat">
+          ·
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 type BodyPayload = {
   user_preferences: Array<{ timezone: string; mass_unit: string }>;
   goals: Array<{ target_mass_kg: unknown }>;
+  profile: { height_cm: unknown } | null;
   body_measurements: Array<{
     id: string;
     measured_at: string;

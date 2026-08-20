@@ -65,6 +65,18 @@ export function isoWeekStart(localDate: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Monday = 1 … Sunday = 7. */
+export function isoWeekday(localDate: string): number {
+  const [year, month, day] = localDate.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const dayIndex = date.getUTCDay();
+  return dayIndex === 0 ? 7 : dayIndex;
+}
+
 export function lastIsoWeekStarts(today: string, count: number): string[] {
   const current = isoWeekStart(today);
   return Array.from({ length: count }, (_, index) =>

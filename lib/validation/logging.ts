@@ -142,4 +142,31 @@ export const strengthSetSchema = z.object({
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
+export const ACTIVITY_TYPES = [
+  "run",
+  "trail_run",
+  "treadmill",
+  "walk",
+  "hike",
+  "cycle",
+  "other",
+] as const;
+
+export const activityEntrySchema = z
+  .object({
+    timeZone: timeZoneField,
+    startedAtLocal: datetimeLocalField,
+    activityType: z.enum(ACTIVITY_TYPES),
+    durationMinutes: optionalNonNegative(24 * 60),
+    distance: optionalNonNegative(500),
+    distanceUnit: z.enum(["km", "mi"]).default("km"),
+    notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  })
+  .refine(
+    (value) =>
+      (value.durationMinutes != null && value.durationMinutes > 0) ||
+      (value.distance != null && value.distance > 0),
+    { message: "Ange tid eller distans." },
+  );
+
 export const idSchema = z.string().uuid();

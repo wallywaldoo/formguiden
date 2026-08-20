@@ -9,17 +9,37 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 
+import { cn } from "@/lib/utils";
+
+function formatHistoryAxis(value: string): string {
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}-01T12:00:00`);
+    return date.toLocaleDateString("sv-SE", { month: "short", year: "numeric" });
+  }
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString("sv-SE", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+  });
+}
+
 export function DistanceChart({
   data,
+  className,
 }: {
   data: Array<{ date: string; distanceKm: number }>;
+  className?: string;
 }) {
   const config = {
     distanceKm: { label: "km", color: "var(--chart-2)" },
   } satisfies ChartConfig;
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-56 w-full">
+    <ChartContainer config={config} className={cn("aspect-auto h-56 w-full", className)}>
       <BarChart accessibilityLayer data={data}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -27,8 +47,14 @@ export function DistanceChart({
           tickLine={false}
           axisLine={false}
           tickMargin={8}
+          minTickGap={22}
+          interval="preserveStartEnd"
+          tickFormatter={formatHistoryAxis}
         />
-        <ChartTooltip content={<ChartTooltipContent />} />
+        <ChartTooltip
+          labelFormatter={(value) => formatHistoryAxis(String(value))}
+          content={<ChartTooltipContent />}
+        />
         <Bar dataKey="distanceKm" fill="var(--color-distanceKm)" radius={4} />
       </BarChart>
     </ChartContainer>

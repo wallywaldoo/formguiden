@@ -13,7 +13,7 @@ import {
   DEFAULT_LOCALE,
   type RaceType,
 } from "@/lib/constants";
-import { goalInputSchema, onboardingSchema } from "@/lib/validation/profile";
+import { goalInputSchema, onboardingSchema, profileSchema } from "@/lib/validation/profile";
 
 type ActionResult = { error?: string };
 
@@ -25,6 +25,33 @@ function formString(formData: FormData, key: string) {
 async function requireSession(): Promise<void> {
   const ok = await getSession();
   if (!ok) throw new Error("Du är inte inloggad.");
+}
+
+async function ensureProfileRow() {
+  const profiles = await sql`SELECT id FROM profiles LIMIT 1`;
+  if (profiles[0]) {
+    return profiles[0].id as string;
+  }
+
+  const inserted = await sql`
+    INSERT INTO profiles (display_name)
+    VALUES (NULL)
+    RETURNING id
+  `;
+  return inserted[0]!.id as string;
+}
+
+async function ensurePreferencesRow() {
+  const prefs = await sql`SELECT id FROM user_preferences LIMIT 1`;
+  if (prefs[0]) {
+    return prefs[0].id as string;
+  }
+
+  const inserted = await sql`
+    INSERT INTO user_preferences DEFAULT VALUES
+    RETURNING id
+  `;
+  return inserted[0]!.id as string;
 }
 
 export async function completeOnboardingAction(
@@ -209,14 +236,28 @@ export async function updateProfileSettingsAction(
   }
 
   try {
-    const prefs = await sql`SELECT id FROM user_preferences LIMIT 1`;
-    const pref = prefs[0];
-    if (!pref) {
-      return { error: "Inställningar saknas. Gå igenom onboarding igen." };
+    const parsed = profileSchema.safeParse({
+      displayName: formString(formData, "displayName"),
+      dateOfBirth: formString(formData, "dateOfBirth"),
+      sexAtBirth: formString(formData, "sexAtBirth"),
+      heightCm: formString(formData, "heightCm"),
+    });
+    if (!parsed.success) {
+      return {
+        error: parsed.error.issues[0]?.message ?? "Ogiltiga profiluppgifter.",
+      };
     }
 
+    const prefsId = await ensurePreferencesRow();
+    await ensureProfileRow();
+
     await sql`
-      UPDATE profiles SET display_name = ${formString(formData, "displayName") || null}
+      UPDATE profiles SET
+        display_name = ${parsed.data.displayName || null},
+        date_of_birth = ${parsed.data.dateOfBirth || null},
+        sex_at_birth = ${parsed.data.sexAtBirth || null},
+        height_cm = ${parsed.data.heightCm}
+      WHERE id = (SELECT id FROM profiles LIMIT 1)
     `;
     await sql`
       UPDATE user_preferences SET
@@ -226,7 +267,7 @@ export async function updateProfileSettingsAction(
         elevation_unit = ${formString(formData, "elevationUnit")},
         volume_unit = ${formString(formData, "volumeUnit")},
         temperature_unit = ${formString(formData, "temperatureUnit")}
-      WHERE id = ${pref.id}
+      WHERE id = ${prefsId}
     `;
   } catch (error) {
     return {

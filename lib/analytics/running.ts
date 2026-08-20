@@ -1,4 +1,5 @@
 import {
+  addDays,
   inInclusiveRange,
   isoWeekStart,
   lastIsoWeekStarts,
@@ -111,6 +112,86 @@ export function dailyDistanceSeries(
     cursor = next.toISOString().slice(0, 10);
   }
   return series;
+}
+
+function daysInclusive(start: string, end: string): number {
+  const [ys, ms, ds] = start.split("-").map(Number) as [number, number, number];
+  const [ye, me, de] = end.split("-").map(Number) as [number, number, number];
+  const from = Date.UTC(ys, ms - 1, ds);
+  const to = Date.UTC(ye, me - 1, de);
+  return Math.round((to - from) / 86_400_000) + 1;
+}
+
+function seriesFromBuckets(
+  byKey: Map<string, number>,
+  start: string,
+  end: string,
+  stepDays: number,
+  keyFor: (cursor: string) => string,
+): Array<{ date: string; distanceKm: number }> {
+  const series: Array<{ date: string; distanceKm: number }> = [];
+  let cursor = start;
+  while (cursor <= end) {
+    const key = keyFor(cursor);
+    series.push({ date: key, distanceKm: byKey.get(key) ?? 0 });
+    cursor = addDays(cursor, stepDays);
+  }
+  return series;
+}
+
+export function historyDistanceSeries(
+  activities: ActivityPoint[],
+  context: AnalyticsContext,
+): Array<{ date: string; distanceKm: number }> {
+  const runs = runFamilyActivities(activities)
+    .map((activity) => withLocalDate(activity, context.timeZone))
+    .filter((activity) => activity.distanceM != null);
+  if (runs.length === 0) {
+    return [];
+  }
+  const today = toLocalDate(context.now.toISOString(), context.timeZone);
+  const oldest = runs.reduce(
+    (min, activity) => (activity.localDate < min ? activity.localDate : min),
+    runs[0]!.localDate,
+  );
+  const span = daysInclusive(oldest, today);
+  const byDate = new Map<string, number>();
+  for (const activity of runs) {
+    const key =
+      span > 365 * 4
+        ? activity.localDate.slice(0, 7)
+        : span > 120
+          ? isoWeekStart(activity.localDate)
+          : activity.localDate;
+    byDate.set(key, (byDate.get(key) ?? 0) + (activity.distanceM ?? 0) / 1000);
+  }
+  if (span > 365 * 4) {
+    const series: Array<{ date: string; distanceKm: number }> = [];
+    let year = Number(oldest.slice(0, 4));
+    let month = Number(oldest.slice(5, 7));
+    const endYear = Number(today.slice(0, 4));
+    const endMonth = Number(today.slice(5, 7));
+    while (year < endYear || (year === endYear && month <= endMonth)) {
+      const key = `${year}-${String(month).padStart(2, "0")}`;
+      series.push({ date: key, distanceKm: byDate.get(key) ?? 0 });
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+    }
+    return series;
+  }
+  if (span > 120) {
+    return seriesFromBuckets(
+      byDate,
+      isoWeekStart(oldest),
+      today,
+      7,
+      (cursor) => isoWeekStart(cursor),
+    );
+  }
+  return seriesFromBuckets(byDate, oldest, today, 1, (cursor) => cursor);
 }
 
 export function longRunConsistency(
@@ -253,14 +334,10 @@ export function weeklyPaceTrend(
   };
 }
 
-export function goalPaceGap(
+export function representativeRunPace(
   activities: ActivityPoint[],
   context: AnalyticsContext,
-): MetricResult<number> {
-  const target = context.goal.targetPaceSPerKm;
-  if (target == null || target <= 0) {
-    return { value: null, completeness: 0, explanationKey: "goal_pace_gap" };
-  }
+): number | null {
   const today = toLocalDate(context.now.toISOString(), context.timeZone);
   const window = rollingWindow(today, 28);
   const runs = runFamilyActivities(activities)
@@ -275,12 +352,135 @@ export function goalPaceGap(
     runs.find(
       (activity) => (activity.distanceM ?? 0) >= REPRESENTATIVE_MIN_DISTANCE_M,
     ) ?? runs[0];
-  if (!representative?.avgPaceSPerKm) {
+  return representative?.avgPaceSPerKm ?? null;
+}
+
+export function goalPaceGap(
+  activities: ActivityPoint[],
+  context: AnalyticsContext,
+): MetricResult<number> {
+  const target = context.goal.targetPaceSPerKm;
+  if (target == null || target <= 0) {
+    return { value: null, completeness: 0, explanationKey: "goal_pace_gap" };
+  }
+  const current = representativeRunPace(activities, context);
+  if (current == null) {
     return { value: null, completeness: 0, explanationKey: "goal_pace_gap" };
   }
   return {
-    value: representative.avgPaceSPerKm - target,
+    value: current - target,
     completeness: 1,
     explanationKey: "goal_pace_gap",
   };
+}
+
+export const RUNNING_RANGE_DAYS = {
+  "7d": 7,
+  "90d": 90,
+  "365d": 365,
+  all: null,
+} as const;
+
+export type RunningRangeKey = keyof typeof RUNNING_RANGE_DAYS;
+
+export function parseRunningRange(
+  value: string | null | undefined,
+): RunningRangeKey {
+  if (value === "7d" || value === "90d" || value === "365d" || value === "all") {
+    return value;
+  }
+  return "90d";
+}
+
+export function filterActivitiesByRange<T extends { startedAt: string }>(
+  activities: T[],
+  context: Pick<AnalyticsContext, "now" | "timeZone">,
+  range: RunningRangeKey,
+): T[] {
+  if (range === "all") return activities;
+  const days = RUNNING_RANGE_DAYS[range];
+  if (days == null) return activities;
+  const today = toLocalDate(context.now.toISOString(), context.timeZone);
+  const window = rollingWindow(today, days);
+  return activities.filter((activity) => {
+    const localDate = toLocalDate(activity.startedAt, context.timeZone);
+    return inInclusiveRange(localDate, window.start, window.end);
+  });
+}
+
+export function weekRunSummary(
+  activities: ActivityPoint[],
+  context: AnalyticsContext,
+) {
+  const today = toLocalDate(context.now.toISOString(), context.timeZone);
+  const window = rollingWindow(today, 7);
+  const runs = runFamilyActivities(activities)
+    .map((activity) => withLocalDate(activity, context.timeZone))
+    .filter((activity) =>
+      inInclusiveRange(activity.localDate, window.start, window.end),
+    );
+
+  const withDistance = runs.filter((run) => run.distanceM != null);
+  const totalDistanceM = withDistance.reduce(
+    (sum, run) => sum + (run.distanceM ?? 0),
+    0,
+  );
+  const withDuration = runs.filter((run) => run.durationS != null);
+  const totalDurationS = withDuration.reduce(
+    (sum, run) => sum + (run.durationS ?? 0),
+    0,
+  );
+  const paces = runs
+    .filter((run) => run.avgPaceSPerKm != null && (run.distanceM ?? 0) > 0)
+    .map((run) => run.avgPaceSPerKm!);
+
+  return {
+    runCount: runs.length,
+    totalDistanceM: withDistance.length > 0 ? totalDistanceM : null,
+    totalDurationS: withDuration.length > 0 ? totalDurationS : null,
+    avgPaceSPerKm: median(paces),
+  };
+}
+
+export function paceTrendSeries(
+  activities: ActivityPoint[],
+  context: AnalyticsContext,
+  days: number,
+): Array<{ date: string; pace: number }> {
+  const today = toLocalDate(context.now.toISOString(), context.timeZone);
+  const window = rollingWindow(today, days);
+  return runFamilyActivities(activities)
+    .map((activity) => withLocalDate(activity, context.timeZone))
+    .filter(
+      (activity) =>
+        activity.avgPaceSPerKm != null &&
+        (activity.distanceM ?? 0) > 1000 &&
+        inInclusiveRange(activity.localDate, window.start, window.end),
+    )
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    .map((activity) => ({
+      date: activity.localDate,
+      pace: activity.avgPaceSPerKm!,
+    }));
+}
+
+export function heartRateTrendSeries(
+  activities: ActivityPoint[],
+  context: AnalyticsContext,
+  days: number,
+): Array<{ date: string; heartRate: number }> {
+  const today = toLocalDate(context.now.toISOString(), context.timeZone);
+  const window = rollingWindow(today, days);
+  return runFamilyActivities(activities)
+    .map((activity) => withLocalDate(activity, context.timeZone))
+    .filter(
+      (activity) =>
+        activity.avgHeartRateBpm != null &&
+        inInclusiveRange(activity.localDate, window.start, window.end),
+    )
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    .map((activity) => ({
+      date: activity.localDate,
+      heartRate: activity.avgHeartRateBpm!,
+    }));
 }

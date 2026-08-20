@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { fromDatetimeLocal, toDatetimeLocal } from "@/lib/analytics/dates";
 import { nutritionProvenance } from "@/lib/nutrition/provenance";
-import { massToKg, volumeToMl } from "@/lib/units/convert";
+import { massToKg, volumeToMl, distanceToMeters } from "@/lib/units/convert";
 import {
+  activityEntrySchema,
   hydrationEntrySchema,
   nutritionEntrySchema,
 } from "@/lib/validation/logging";
@@ -24,6 +25,11 @@ describe("unit conversion", () => {
 
   it("stores mass in kilograms", () => {
     expect(massToKg(154.32, "lb")).toBeCloseTo(70, 1);
+  });
+
+  it("stores distance in metres", () => {
+    expect(distanceToMeters(10, "km")).toBe(10_000);
+    expect(distanceToMeters(1, "mi")).toBeCloseTo(1609.344, 3);
   });
 });
 
@@ -96,6 +102,31 @@ describe("logging validation", () => {
       volume: "0",
       volumeUnit: "ml",
       beverageType: "water",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts a manual run with time and distance", () => {
+    const parsed = activityEntrySchema.safeParse({
+      timeZone: "Europe/Stockholm",
+      startedAtLocal: "2026-04-12T07:00",
+      activityType: "run",
+      durationMinutes: "45",
+      distance: "8,2",
+      distanceUnit: "km",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.durationMinutes).toBe(45);
+      expect(parsed.data.distance).toBe(8.2);
+    }
+  });
+
+  it("rejects a pass without time or distance", () => {
+    const parsed = activityEntrySchema.safeParse({
+      timeZone: "Europe/Stockholm",
+      startedAtLocal: "2026-04-12T07:00",
+      activityType: "walk",
     });
     expect(parsed.success).toBe(false);
   });

@@ -5,50 +5,89 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AutomationTokenForm } from "@/features/automation/token-form";
 import { ExportPanel } from "@/features/privacy/export-panel";
 import { AccountDeletionForm } from "@/features/privacy/deletion-form";
+import { GarminSyncPanel } from "@/features/sync/garmin-sync-panel";
 import { PRIVACY_DOCUMENT_VERSION } from "@/lib/constants";
-import { listExportJobs } from "@/lib/db/queries";
+import { getGarminIntegrationStatus, listExportJobs } from "@/lib/db/queries";
+import { readGarminSyncStatus } from "@/lib/garmin/status";
+import sql from "@/lib/db";
 
-export default async function PrivacySettingsPage() {
-  let jobs: Array<{
-    id: string;
-    status: string;
-    error_summary: string | null;
-    created_at: string;
-    completed_at: string | null;
-  }> = [];
+export default async function AccountSettingsPage() {
+  const [jobsResult, garminResult, importResult] = await Promise.allSettled([
+    listExportJobs(),
+    getGarminIntegrationStatus(),
+    sql`
+      SELECT status, created_at, committed_at, committed_count
+      FROM data_imports
+      WHERE provider = 'garmin-sync'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+  ]);
 
-  try {
-    jobs = await listExportJobs();
-  } catch {
-    jobs = [];
-  }
+  const jobs =
+    jobsResult.status === "fulfilled"
+      ? jobsResult.value
+      : [];
+  const garminStatus = readGarminSyncStatus(
+    garminResult.status === "fulfilled" ? garminResult.value : null,
+  );
+  const lastImport =
+    importResult.status === "fulfilled"
+      ? ((importResult.value[0] as unknown as {
+          status: string;
+          created_at: string;
+          committed_at: string | null;
+          committed_count: number;
+        }) ?? null)
+      : null;
 
   return (
-    <div className="mx-auto max-w-xl space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Integritet</h1>
-        <p className="text-muted-foreground">
-          Hälsodata är privat per konto. Formkurvan ger inga medicinska råd.
-        </p>
-      </div>
+    <div className="mx-auto max-w-xl space-y-6">
+      <h1 className="page-title">Konto</h1>
+
+      <GarminSyncPanel initialStatus={garminStatus} />
+
       <Card>
         <CardHeader>
-          <CardTitle>Godkännande</CardTitle>
+          <CardTitle>Lokal Garmin-sync</CardTitle>
+          <CardDescription>
+            Ett skript på din dator hämtar från Garmin Connect. Inloggningen
+            lämnar aldrig maskinen.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          {lastImport ? (
+            <p>
+              Senaste körningen:{" "}
+              {new Date(
+                lastImport.committed_at ?? lastImport.created_at,
+              ).toLocaleString("sv-SE")}
+              {lastImport.status === "committed"
+                ? ` · ${lastImport.committed_count} rader landade`
+                : ` · status ${lastImport.status}`}
+              .
+            </p>
+          ) : (
+            <p>Ingen automatisk körning har kommit in än.</p>
+          )}
+          <AutomationTokenForm tokens={[]} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Integritet</CardTitle>
           <CardDescription>
             Dokumentversion {PRIVACY_DOCUMENT_VERSION}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            Du har bekräftat att Garmin-filer är export du själv laddar upp, att
-            ingen annan användare kan läsa dina rader, och att appen inte är
-            vård.
-          </p>
-          <p>
-            Session-cookien är httpOnly och skyddad mot XSS.
-            En CSRF-attack mot formulär motverkas av SameSite=lax.
+            Hälsodata är privat per konto. Garmin-filer är export du själv
+            laddar upp. Formkurvan ger inga medicinska råd.
           </p>
         </CardContent>
       </Card>

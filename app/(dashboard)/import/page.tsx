@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -48,19 +47,15 @@ export default async function ImportPage({
 
   return (
     <div className="space-y-8">
-      <div className="space-y-3">
-        <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
-          Efter passet
+      <h1 className="page-title">Importera</h1>
+      <section className="surface-tile space-y-2 px-5 py-5">
+        <p className="text-[0.95rem] font-semibold">När ska jag använda den här sidan?</p>
+        <p className="text-[0.88rem] leading-6 text-muted-foreground">
+          Den vanliga vägen är knappen <span className="font-medium text-foreground">Synca</span> uppe till höger.
+          Den hämtar pass och hälsa från Garmin automatiskt. Den här sidan är backupen:
+          släpp en FIT-fil, en ZIP med flera pass, eller en extra fil som synken missade.
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-          Klockan hemma. Formkurvan i telefonen.
-        </h1>
-        <p className="max-w-2xl text-muted-foreground text-pretty">
-          Garmin Connect är källan. Formkurvan är din privata coach. Du
-          exporterar, släpper, och vi tar bara det som är nytt — ungefär som
-          Strava, utan att be om ditt Garmin-lösenord.
-        </p>
-      </div>
+      </section>
 
       {params.error ? (
         <Alert variant="destructive">
@@ -75,9 +70,6 @@ export default async function ImportPage({
       <Card>
         <CardHeader>
           <CardTitle>Tidigare inhämtningar</CardTitle>
-          <CardDescription>
-            Varje släpp är en händelse. Dubbletter räknas, inget skrivs över.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           {imports.length === 0 ? (

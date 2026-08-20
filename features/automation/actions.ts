@@ -29,6 +29,6 @@ export async function revokeAutomationTokenAction(
   if (!ok) {
     return { error: "Du är inte inloggad." };
   }
-  revalidatePath("/settings/integrations");
+  revalidatePath("/settings/privacy");
   return {};
 }

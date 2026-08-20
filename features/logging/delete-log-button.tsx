@@ -29,7 +29,7 @@ export function DeleteLogButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="ghost" size="sm">
+        <Button type="button" variant="ghost" size="sm" className="min-h-11 md:min-h-8">
           Ta bort
         </Button>
       </AlertDialogTrigger>

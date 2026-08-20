@@ -8,19 +8,19 @@ import {
 
 const rituals = [
   {
-    title: "Efter passet",
-    time: "10 sekunder",
-    body: "I Garmin Connect: öppna aktiviteten → exportera Original/FIT. Släpp filen här eller dela den till Formkurvan från telefonen.",
+    title: "Ett pass",
+    time: "FIT-fil",
+    body: "Öppna passet i Garmin Connect, exportera Original/FIT och släpp filen här. Bra när ett enskilt pass saknas efter synken.",
   },
   {
-    title: "Söndagsfångst",
-    time: "en ZIP",
-    body: "Exportera veckans pass i en ZIP. Formkurvan känner igen dubbletter, så du kan släppa samma vecka om och om igen.",
+    title: "En hel vecka",
+    time: "ZIP",
+    body: "Flera FIT-filer i en ZIP. Formkurvan känner igen dubbletter, så du kan släppa samma vecka mer än en gång.",
   },
   {
     title: "Historik",
     time: "en gång",
-    body: "Första gången: flera FIT-filer eller en ZIP med säsongen. Därefter räcker det med nya pass. Inget skrivs över.",
+    body: "Första gången: släpp säsongen. Därefter räcker Synca till vardags. Inget skrivs över.",
   },
 ];
 

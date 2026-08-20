@@ -17,6 +17,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      position="top-center"
+      offset={{ top: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
+      mobileOffset={{ top: "max(0.75rem, env(safe-area-inset-top, 0px))" }}
       // richColors paints destructive/success/warning toasts in their
       // semantic color (red/green/amber) rather than the neutral popover
       // bg, so toast.error("…") is visibly red — used for the submission

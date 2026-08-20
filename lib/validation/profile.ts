@@ -28,10 +28,6 @@ export const preferencesSchema = z.object({
   temperatureUnit: temperatureUnitSchema,
 });
 
-export const profileSchema = z.object({
-  displayName: z.string().trim().max(32).optional().or(z.literal("")),
-});
-
 const optionalPositiveNumber = z
   .string()
   .optional()
@@ -45,6 +41,20 @@ const optionalPositiveNumber = z
   .refine((value) => value === null || (value > 0 && Number.isFinite(value)), {
     message: "Ange ett positivt tal.",
   });
+
+export const profileSchema = z.object({
+  displayName: z.string().trim().max(32).optional().or(z.literal("")),
+  dateOfBirth: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value),
+      "Ange datum som ÅÅÅÅ-MM-DD.",
+    ),
+  sexAtBirth: z.enum(["female", "male", "unspecified", ""]).optional(),
+  heightCm: optionalPositiveNumber,
+});
 
 const optionalPositiveInt = z
   .string()

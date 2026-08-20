@@ -6,7 +6,12 @@ import {
   summarizeCoachSignals,
 } from "@/features/assistant/coach-response";
 import { getCoachContextData } from "@/features/assistant/queries";
+import { loadTrainingSnapshotInput } from "@/features/training-plan/load";
+import { ensureTrainingPlans } from "@/features/training-plan/service";
+import { generateCoachChatReply } from "@/lib/ai/training/coach";
+import { isTrainingAiEnabled } from "@/lib/ai/training/create-generator";
 import { getSession } from "@/lib/auth";
+import { buildTrainingSnapshot } from "@/lib/training-plan/snapshot";
 
 export const maxDuration = 30;
 
@@ -41,14 +46,37 @@ export async function POST(request: Request) {
 
   try {
     const context = await getCoachContextData();
-    const result = generateCoachResponse({
+    const fallback = generateCoachResponse({
       message: parsed.data.message,
       context,
     });
+    const summary = summarizeCoachSignals({ context });
+
+    if (isTrainingAiEnabled() && process.env.TRAINING_AI_PROVIDER === "openai") {
+      try {
+        const plans = await ensureTrainingPlans();
+        const snapshot = buildTrainingSnapshot(
+          await loadTrainingSnapshotInput({ now: new Date() }),
+        );
+        const reply = await generateCoachChatReply({
+          message: parsed.data.message,
+          snapshot,
+          today: plans?.today ?? null,
+          week: plans?.week ?? null,
+        });
+        return NextResponse.json({
+          reply,
+          summary,
+          generatedAt: new Date().toISOString(),
+        });
+      } catch {
+        // Fall back to the deterministic coach if the model call fails.
+      }
+    }
 
     return NextResponse.json({
-      reply: result.reply,
-      summary: summarizeCoachSignals({ context }),
+      reply: fallback.reply,
+      summary,
       generatedAt: new Date().toISOString(),
     });
   } catch {

@@ -8,6 +8,7 @@
 
 import sql from "@/lib/db";
 import { GarminClient } from "@/lib/garmin/client";
+import { ensureWeekRecaps } from "@/features/week-recap/service";
 
 function dateRange(startDate: string, endDate: string): string[] {
   const dates: string[] = [];
@@ -57,7 +58,9 @@ export async function runGarminSync(options: {
   const client = GarminClient.fromEnv();
 
   const endDate = options.endDate ? new Date(options.endDate) : new Date();
-  const startDate = options.startDate ? new Date(options.startDate) : new Date();
+  const startDate = options.startDate
+    ? new Date(options.startDate)
+    : new Date();
   if (!options.startDate) {
     startDate.setDate(endDate.getDate() - (days - 1));
   }
@@ -94,6 +97,10 @@ export async function runGarminSync(options: {
         errors.push(`hrv ${date}: ${(hrv.reason as Error).message}`);
       }
 
+      if (!s && !sl && !h) {
+        continue;
+      }
+
       await sql`
         INSERT INTO daily_health_metrics (
           local_date, source,
@@ -105,7 +112,7 @@ export async function runGarminSync(options: {
           steps, respiration_avg_brpm
         ) VALUES (
           ${date}, 'garmin-api',
-          ${sl?.sleepDurationS ?? null},
+          ${sl?.sleepDurationS ?? s?.sleepDurationS ?? null},
           ${sl?.sleepStartAt ?? null},
           ${sl?.sleepEndAt ?? null},
           ${sl?.sleepLightS ?? null},
@@ -122,20 +129,20 @@ export async function runGarminSync(options: {
         )
         ON CONFLICT (local_date, source)
         DO UPDATE SET
-          sleep_duration_s    = EXCLUDED.sleep_duration_s,
-          sleep_start_at      = EXCLUDED.sleep_start_at,
-          sleep_end_at        = EXCLUDED.sleep_end_at,
-          sleep_light_s       = EXCLUDED.sleep_light_s,
-          sleep_deep_s        = EXCLUDED.sleep_deep_s,
-          sleep_rem_s         = EXCLUDED.sleep_rem_s,
-          sleep_awake_s       = EXCLUDED.sleep_awake_s,
-          hrv_rmssd_ms        = EXCLUDED.hrv_rmssd_ms,
-          resting_heart_rate_bpm = EXCLUDED.resting_heart_rate_bpm,
-          stress_avg          = EXCLUDED.stress_avg,
-          body_battery_high   = EXCLUDED.body_battery_high,
-          body_battery_low    = EXCLUDED.body_battery_low,
-          steps               = EXCLUDED.steps,
-          respiration_avg_brpm = EXCLUDED.respiration_avg_brpm,
+          sleep_duration_s    = COALESCE(EXCLUDED.sleep_duration_s, daily_health_metrics.sleep_duration_s),
+          sleep_start_at      = COALESCE(EXCLUDED.sleep_start_at, daily_health_metrics.sleep_start_at),
+          sleep_end_at        = COALESCE(EXCLUDED.sleep_end_at, daily_health_metrics.sleep_end_at),
+          sleep_light_s       = COALESCE(EXCLUDED.sleep_light_s, daily_health_metrics.sleep_light_s),
+          sleep_deep_s        = COALESCE(EXCLUDED.sleep_deep_s, daily_health_metrics.sleep_deep_s),
+          sleep_rem_s         = COALESCE(EXCLUDED.sleep_rem_s, daily_health_metrics.sleep_rem_s),
+          sleep_awake_s       = COALESCE(EXCLUDED.sleep_awake_s, daily_health_metrics.sleep_awake_s),
+          hrv_rmssd_ms        = COALESCE(EXCLUDED.hrv_rmssd_ms, daily_health_metrics.hrv_rmssd_ms),
+          resting_heart_rate_bpm = COALESCE(EXCLUDED.resting_heart_rate_bpm, daily_health_metrics.resting_heart_rate_bpm),
+          stress_avg          = COALESCE(EXCLUDED.stress_avg, daily_health_metrics.stress_avg),
+          body_battery_high   = COALESCE(EXCLUDED.body_battery_high, daily_health_metrics.body_battery_high),
+          body_battery_low    = COALESCE(EXCLUDED.body_battery_low, daily_health_metrics.body_battery_low),
+          steps               = COALESCE(EXCLUDED.steps, daily_health_metrics.steps),
+          respiration_avg_brpm = COALESCE(EXCLUDED.respiration_avg_brpm, daily_health_metrics.respiration_avg_brpm),
           updated_at          = now()
       `;
       healthDaysUpserted++;
@@ -158,9 +165,7 @@ export async function runGarminSync(options: {
       weightEntriesUpserted++;
     }
   } catch (err) {
-    errors.push(
-      `weight: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    errors.push(`weight: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // ── Activities ───────────────────────────────────────────────────────────
@@ -182,7 +187,7 @@ export async function runGarminSync(options: {
           ? Math.round(1000 / act.averageSpeed)
           : null;
 
-      await sql`
+      const inserted = await sql`
         INSERT INTO activities (
           source, external_id, activity_type,
           started_at, duration_s, distance_m,
@@ -210,8 +215,9 @@ export async function runGarminSync(options: {
           max_heart_rate_bpm  = EXCLUDED.max_heart_rate_bpm,
           avg_pace_s_per_km   = EXCLUDED.avg_pace_s_per_km,
           calories_kcal       = EXCLUDED.calories_kcal,
-          notes               = EXCLUDED.notes,
+          notes               = COALESCE(activities.notes, EXCLUDED.notes),
           updated_at          = now()
+        RETURNING id
       `;
       activitiesUpserted++;
     }
@@ -219,6 +225,12 @@ export async function runGarminSync(options: {
     errors.push(
       `activities: ${err instanceof Error ? err.message : String(err)}`,
     );
+  }
+
+  try {
+    await ensureWeekRecaps();
+  } catch {
+    // Recap snapshot is best-effort; sync should still succeed.
   }
 
   return {
